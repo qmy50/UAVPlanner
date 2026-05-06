@@ -50,6 +50,9 @@ roslaunch minco_curve test_my_fsm.launch
 
 ## 三. 使用PX4进行在环仿真：
 
+<img width="2425" height="1325" alt="a5bea344c9540a3221604caa8a0a6833" src="https://github.com/user-attachments/assets/5b70684a-d02f-4cea-8692-3245c28cfc32" />
+
+
 这里需要配置好开源无人机仿真平台XTdrone。
 
 开源链接为： https://gitee.com/robin_shaun/XTDrone
