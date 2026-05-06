@@ -15,3 +15,17 @@
 5.集成 EGO-Planner 中的 SO3 控制器完成高精度轨迹跟踪控制
 
 该方案适用于未知环境下的无人机自主导航、动态避障与平滑轨迹跟踪任务。
+
+## 二. 运行：
+
+---
+git clone https://github.com/qmy50/UAVPlanner.git
+或者
+git clone https://gitee.com/qiu-mengyao114/UAVPlanner.git
+
+catkin_make
+
+source ./devel/setup.bash
+
+roslaunch minco_curve test_my_fsm.launch
+---
