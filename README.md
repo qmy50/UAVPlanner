@@ -100,3 +100,13 @@ roslaunch rosbridge_server rosbridge_websocket.launch
 roslaunch minco_curve test_my_fsm.launch
 ```
 随后可以向大语言模型输入“控制无人机想最前方飞行10m”等命令来控制无人机前往目标点
+
+
+## 四. Reference：
+[1]. 规划器整体建构及轨迹跟踪与动态环境更新，a*搜索等模块参考/使用 ego planner 链接为：https://github.com/ZJU-FAST-Lab/ego-planner
+
+[2]. 三维安全走廊生成采用开源库DecompROS，链接为：[https://github.com/Photin1a/FlowCore](https://github.com/sikang/DecompROS)
+
+[3]. 将STC与minco相结合参考了二维规划器FlowCore，链接为：https://github.com/Photin1a/FlowCore
+
+[4]. 加入安全走廊硬约束的离散minisnap QP求解参考链接为：https://github.com/Gerrylgr/trajectory_optimization
