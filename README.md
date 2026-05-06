@@ -1,6 +1,6 @@
 # UAV Global Planner Based on STC and MINCO
 
-# 本项目为基于深度相机的六自由度四旋翼动态避障路径规划器
+# 基于安全走廊与MINCO的四旋翼动态避障路径规划器
 
 # 工作流程：
 
