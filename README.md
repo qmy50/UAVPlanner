@@ -50,7 +50,11 @@ roslaunch minco_curve test_my_fsm.launch
 
 ## 三. 使用PX4进行在环仿真：
 
-这里需要配置好开源无人机仿真平台XTdrone，链接： https://gitee.com/robin_shaun/XTDrone
+这里需要配置好开源无人机仿真平台XTdrone。
+
+开源链接为： https://gitee.com/robin_shaun/XTDrone
+
+使用文档为： https://www.yuque.com/xtdrone/manual_cn
 
 配置好后，运行
 ```
@@ -77,4 +81,22 @@ roslaunch minco_curve run_in_XTdrone.launch
 
 此时可以在rviz中使用3D navgoal设置目标点并在gazebo中看到无人机向目标点飞行
 
+## 四. 使用MCP服务器控制无人机：
 
+可以结合该规划器，通过配置mcp server 来使用大语言模型进行无人机控制。
+
+关于ros的mcp server使用详见项目： https://github.com/robotmcp/ros-mcp-server
+
+可以参考Planner/script/mcp_config.json进行mcp服务器配置，注意需要根据本地路径对文件进行修改
+
+在安装好rosbridge后，运行开启rosbridge
+```
+roslaunch rosbridge_server rosbridge_websocket.launch
+```
+
+并开启rviz仿真
+
+```
+roslaunch minco_curve test_my_fsm.launch
+```
+随后可以向大语言模型输入“控制无人机想最前方飞行10m”等命令来控制无人机前往目标点
