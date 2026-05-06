@@ -16,18 +16,26 @@
 
 该方案适用于未知环境下的无人机自主导航、动态避障与平滑轨迹跟踪任务。
 
-## 二. 运行：
+## 二. Quick Start：
 
 
+克隆项目到本地
 ```
 git clone https://github.com/qmy50/UAVPlanner.git
+```
 或者
+```
 git clone https://gitee.com/qiu-mengyao114/UAVPlanner.git
-
+```
+编译
+```
 catkin_make
-
+```
+```
 source ./devel/setup.bash
+```
 
+运行rviz仿真
+```
 roslaunch minco_curve test_my_fsm.launch
-
 ```
