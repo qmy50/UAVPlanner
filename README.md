@@ -105,10 +105,12 @@ roslaunch minco_curve test_my_fsm.launch
 ## 四. Reference：
 [1]. 规划器整体建构及轨迹跟踪与动态环境更新，a*搜索等模块参考/使用 ego planner 
 
-    链接为：https://github.com/ZJU-FAST-Lab/ego-planner
+链接为：https://github.com/ZJU-FAST-Lab/ego-planner
 
 [2]. 三维安全走廊生成采用开源库DecompROS，链接为：[https://github.com/Photin1a/FlowCore](https://github.com/sikang/DecompROS)
 
 [3]. 将STC与minco相结合参考了二维规划器FlowCore，链接为：https://github.com/Photin1a/FlowCore
 
-[4]. 加入安全走廊硬约束的离散minisnap QP求解参考链接为：https://github.com/Gerrylgr/trajectory_optimization
+[4]. 加入安全走廊硬约束的离散minisnap QP求解，参考链接为：https://github.com/Gerrylgr/trajectory_optimization
+
+[5]. PX4仿真部分使用XTdroen，链接为： https://gitee.com/robin_shaun/XTDrone
