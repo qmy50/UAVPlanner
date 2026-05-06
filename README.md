@@ -18,6 +18,7 @@
 
 ## 二. Quick Start：
 
+在rviz中进行纯数字仿真
 
 克隆项目到本地
 ```
@@ -39,3 +40,41 @@ source ./devel/setup.bash
 ```
 roslaunch minco_curve test_my_fsm.launch
 ```
+
+仿真相关参数可以在test_my_fsm.launch, simulator.xml以及advance_param.xml文件中设置。 
+
+支持在rviz中使用3D navgoal plugin手动设置航点，或使用launch文件中给定航点两种模式。
+
+建议设置最大飞行速度在2m/s内。
+
+
+## 三. 使用PX4进行在环仿真：
+
+这里需要配置好开源无人机仿真平台XTdrone，链接： https://gitee.com/robin_shaun/XTDrone
+
+配置好后，运行
+```
+roslaunch px4 indoor1.launch
+```
+
+按照文档开启无人机offboard模式,起飞并悬停，推出键盘控制节点
+
+开启使用gazebo位姿真值节点
+```
+cd ~/XTDrone/sensing/pose_ground_truth/
+python get_local_pose.py iris 1
+```
+开启视角转换节点
+```
+cd ~/XTDrone/motion_planning/3d
+python ego_transfer.py iris 0
+```
+
+开启规划器
+```
+roslaunch minco_curve run_in_XTdrone.launch
+```
+
+此时可以在rviz中使用3D navgoal设置目标点并在gazebo中看到无人机向目标点飞行
+
+
