@@ -18,7 +18,8 @@
 
 ## 二. 运行：
 
----
+
+```
 git clone https://github.com/qmy50/UAVPlanner.git
 或者
 git clone https://gitee.com/qiu-mengyao114/UAVPlanner.git
@@ -28,4 +29,5 @@ catkin_make
 source ./devel/setup.bash
 
 roslaunch minco_curve test_my_fsm.launch
----
+
+```
