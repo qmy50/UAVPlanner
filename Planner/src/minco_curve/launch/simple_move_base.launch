@@ -1,0 +1,10 @@
+<launch>
+    <arg name="fixed_frame" default="world"/>
+
+    <node pkg="minco_curve" type="test_node" name="test_traj" output="screen"/>
+    <node pkg="minco_curve" type="traj_server_node" name="traj_server" output="screen"/>
+    <node pkg="rviz" type="rviz" name="minco_rviz" args="-d $(find minco_curve)/rviz/display_3D.rviz" output="screen"/>
+    <!-- <node pkg="map_server" type="map_server" name="map_server" args="$(find minco_curve)/maps/map.yaml"/> -->
+        <node pkg="tf2_ros" type="static_transform_publisher" name="map_to_world"
+    args="0.0 0.0 0 0.0 0.0 0.0 world map " />
+</launch>

@@ -1,0 +1,29 @@
+{
+  "mcpServers": {
+    "rosMcpServer": {
+      "disabled": false,
+      "timeout": 120,
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/home/tianbot/ros_mcp_server",
+        "run",
+        "/home/tianbot/ros_mcp_server/ros_mcp/main.py"
+      ]
+    },
+    "uavMcpServer": {
+      "disabled": false,
+      "timeout": 120,
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/home/tianbot/ros_mcp_server",
+        "run",
+        "/home/tianbot/ros_mcp_server/test_uav_mcp.py"
+      ]
+    }
+  }
+  
+}
