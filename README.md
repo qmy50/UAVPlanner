@@ -85,6 +85,10 @@ roslaunch minco_curve run_in_XTdrone.launch
 ```
 
 此时可以在rviz中使用3D navgoal设置目标点并在gazebo中看到无人机向目标点飞行
+<div align="center">
+<img width="600" height="325" alt="2026年05月07日 屏幕视频 17时12分33秒(1)" src="https://github.com/user-attachments/assets/00af1713-bdd2-4fe7-bb40-8a77aaf66eb1" />
+</div>
+
 
 ## 四. 使用MCP服务器控制无人机：
 
