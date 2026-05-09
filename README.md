@@ -40,8 +40,9 @@ source ./devel/setup.bash
 ```
 roslaunch minco_curve test_my_fsm.launch
 ```
+<div align="center">
 <img width="400" height="225" alt="2026年05月07日 屏幕视频 16时31分57秒(1)" src="https://github.com/user-attachments/assets/ecdaf5c6-0460-4635-9a3d-63906787f3a3" />
-
+</div>
 
 仿真相关参数可以在test_my_fsm.launch, simulator.xml以及advance_param.xml文件中设置。 
 
