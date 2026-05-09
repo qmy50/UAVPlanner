@@ -106,6 +106,8 @@ roslaunch minco_curve test_my_fsm.launch
 ```
 随后可以向大语言模型输入“控制无人机想最前方飞行10m”等命令来控制无人机前往目标点
 
+<img width="600" height="325" alt="2026年05月07日 屏幕视频 16时39分49秒(1)" src="https://github.com/user-attachments/assets/2e5631a0-5cd3-4eb0-973a-6425bf00cd29" />
+
 
 ## 四. Reference：
 [1]. 规划器整体建构及轨迹跟踪与动态环境更新，a*搜索等模块参考/使用 ego planner 
