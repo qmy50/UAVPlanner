@@ -41,6 +41,9 @@ source ./devel/setup.bash
 roslaunch minco_curve test_my_fsm.launch
 ```
 
+![Uploading 2026年05月07日 屏幕视频 16时31分57秒(1).gif…]()
+
+
 仿真相关参数可以在test_my_fsm.launch, simulator.xml以及advance_param.xml文件中设置。 
 
 支持在rviz中使用3D navgoal plugin手动设置航点，或使用launch文件中给定航点两种模式。
