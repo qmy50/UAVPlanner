@@ -112,17 +112,24 @@ roslaunch rosbridge_server rosbridge_websocket.launch
 roslaunch minco_curve test_my_fsm.launch
 ```
 随后可以向大语言模型输入“控制无人机想最前方飞行10m”等命令来控制无人机前往目标点
-<div align="center">
-<img width="600" height="325" alt="2026年05月07日 屏幕视频 16时39分49秒(1)" src="https://github.com/user-attachments/assets/2e5631a0-5cd3-4eb0-973a-6425bf00cd29" />
-</div>
-
 
 
 https://github.com/user-attachments/assets/976ccb1e-e4e9-4f59-be26-1e8c62647dec
 
+## 五. 加入动态障碍物避障功能
 
+针对移动障碍物，使用[基于意图预测MPC机器人无人机导航动态避障](https://github.com/Zhefan-Xu/Intent-MPC)项目的动态障碍物提取模块onboard_detector提取动态障碍物并使用DWA完成避障
+运行方式为在advance_param.xml文件中设置
+```
+roslaunch rosbridge_server rosbridge_websocket.launch
+```
 
-## 四. Reference：
+并在运行run_in_XTdrone.launch文件前执行
+```
+roslaunch onboard_detector run_detector.launch
+```
+
+## 六. Reference：
 [1]. 规划器整体建构及轨迹跟踪与动态环境更新，a*搜索等模块参考/使用 ego planner 
 
 链接为：https://github.com/ZJU-FAST-Lab/ego-planner
