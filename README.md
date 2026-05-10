@@ -40,9 +40,9 @@ source ./devel/setup.bash
 ```
 roslaunch minco_curve test_my_fsm.launch
 ```
-<div align="center">
-<img width="600" height="325" alt="2026年05月07日 屏幕视频 16时31分57秒(1)" src="https://github.com/user-attachments/assets/ecdaf5c6-0460-4635-9a3d-63906787f3a3" />
-</div>
+
+https://github.com/user-attachments/assets/92d40b16-56c5-40ad-b23e-0dfc749f18c1
+
 
 仿真相关参数可以在test_my_fsm.launch, simulator.xml以及advance_param.xml文件中设置。 
 
@@ -85,9 +85,12 @@ roslaunch minco_curve run_in_XTdrone.launch
 ```
 
 此时可以在rviz中使用3D navgoal设置目标点并在gazebo中看到无人机向目标点飞行
-<div align="center">
-<img width="600" height="325" alt="2026年05月07日 屏幕视频 17时12分33秒(1)" src="https://github.com/user-attachments/assets/00af1713-bdd2-4fe7-bb40-8a77aaf66eb1" />
-</div>
+
+
+
+https://github.com/user-attachments/assets/a9a4fcd8-9a7d-40db-8fd1-cf06d324379d
+
+
 
 
 ## 四. 使用MCP服务器控制无人机：
@@ -112,6 +115,12 @@ roslaunch minco_curve test_my_fsm.launch
 <div align="center">
 <img width="600" height="325" alt="2026年05月07日 屏幕视频 16时39分49秒(1)" src="https://github.com/user-attachments/assets/2e5631a0-5cd3-4eb0-973a-6425bf00cd29" />
 </div>
+
+
+
+https://github.com/user-attachments/assets/976ccb1e-e4e9-4f59-be26-1e8c62647dec
+
+
 
 ## 四. Reference：
 [1]. 规划器整体建构及轨迹跟踪与动态环境更新，a*搜索等模块参考/使用 ego planner 
