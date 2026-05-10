@@ -135,10 +135,15 @@ roslaunch onboard_detector run_detector.launch
 
 链接为：https://github.com/ZJU-FAST-Lab/ego-planner
 
-[2]. 三维安全走廊生成采用开源库DecompROS，链接为：[https://github.com/Photin1a/FlowCore](https://github.com/sikang/DecompROS)
+[2]. 三维安全走廊生成采用开源库DecompROS，链接为：https://github.com/sikang/DecompROS
 
 [3]. 将STC与minco相结合参考了二维规划器FlowCore，链接为：https://github.com/Photin1a/FlowCore
 
 [4]. 加入安全走廊硬约束的离散minisnap QP求解，参考链接为：https://github.com/Gerrylgr/trajectory_optimization
 
 [5]. PX4仿真部分使用XTdroen，链接为： https://gitee.com/robin_shaun/XTDrone
+
+[6]. 基于意图预测MPC机器人无人机导航动态避障，链接为： https://github.com/Zhefan-Xu/Intent-MPC
+
+[7]. DWA控制器参考链接为: https://github.com/QnJiu/ROS2-DWA-Autonomous-Navigation
+
