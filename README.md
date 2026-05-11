@@ -129,6 +129,11 @@ https://github.com/user-attachments/assets/976ccb1e-e4e9-4f59-be26-1e8c62647dec
 roslaunch onboard_detector run_detector.launch
 ```
 
+
+https://github.com/user-attachments/assets/85a1c213-504a-4d8b-ad33-5cb47a72ddd9
+
+
+
 ## 六. Reference：
 [1]. 规划器整体建构及轨迹跟踪与动态环境更新，a*搜索等模块参考/使用 ego planner 
 
