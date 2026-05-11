@@ -120,7 +120,7 @@ https://github.com/user-attachments/assets/976ccb1e-e4e9-4f59-be26-1e8c62647dec
 
 针对移动障碍物，使用[基于意图预测MPC机器人无人机导航动态避障](https://github.com/Zhefan-Xu/Intent-MPC)项目的动态障碍物提取模块onboard_detector提取动态障碍物，
 并使用DWA完成避障
-运行方式为在advance_param.xml文件中设置
+运行方式为在advance_param.xml文件中设置<param name="fsm/use_dwa" value="true"/>
 ```
 roslaunch rosbridge_server rosbridge_websocket.launch
 ```
