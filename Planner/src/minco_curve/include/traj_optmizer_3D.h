@@ -27,7 +27,7 @@
 #include <path_searching/dyn_a_star_new.h>
 #include <decomp_ros_msgs/PolyhedronArray.h>
 #include <decomp_ros_utils/data_ros_utils.h>
-#include <plan_env/grid_map.h>
+#include <plan_env/grid_map_new.h>
 
 
 class PathPlannerSim3D{
@@ -71,6 +71,7 @@ class PathPlannerSim3D{
         poly_traj::Trajectory current_traj_;
 
     public:
+        std::vector<Eigen::Vector3d> current_minisnap_waypoints_;
         PathPlannerSim3D(ros::NodeHandle &nh);
         void setParam(ros::NodeHandle &nh);
         void setEnvironment(const GridMap::Ptr &map);
@@ -90,7 +91,7 @@ class PathPlannerSim3D{
         void polyTraj2ROSMsg(traj_utils::PolyTraj &poly_msg);
         bool checkTrajCollision();
         bool have_a_star_path_;
-        bool have_minco_waypoints_;
+        bool have_minco_waypoints_,have_minisnap_waypoints_;
         bool have_current_traj_;
         bool use_real_model_;
 
@@ -106,6 +107,10 @@ class PathPlannerSim3D{
             return current_traj_;
         }
 
+        inline bool getCurrentMinisnapPoints(){
+
+            return have_minisnap_waypoints_;
+        }
     
     public:
         typedef std::unique_ptr<PathPlannerSim3D> Ptr;

@@ -5,7 +5,8 @@
 #include "plan_container.hpp"
 #include <ros/ros.h>
 #include <memory>
-#include <plan_env/grid_map.h>
+#include <plan_env/grid_map_new.h>
+#include "simple_dwa.h"
 
 
 namespace fake_planner{
@@ -32,6 +33,15 @@ namespace fake_planner{
 
             bool getCurrentTraj();
 
+            void updateGlobalPathPoints();
+
+            Eigen::Vector3d getLookaheadTarget(const Eigen::Vector3d& current_pos,
+                                                            double lookahead_dist);
+
+            DWAController::Velocity getDWAcmd(const std::vector<double>& pose, 
+                                                double v_c, double w_c,
+                                                double dynamic_safe_radius);
+
             inline bool needRePlan(){
                 if(path_optimizer_rebound_->checkTrajCollision() || !path_optimizer_rebound_->have_current_traj_){
                     return true;
@@ -44,10 +54,12 @@ namespace fake_planner{
             GridMap::Ptr grid_map_;
 
 
-
         private:
             PathPlannerSim3D::Ptr path_optimizer_rebound_;
-            std::vector<Eigen::Vector3d> current_waypoints_;
+            DWAController::Ptr dwa_controller_;
+
+
+            std::vector<Eigen::Vector3d> global_path_points_;
 
         public:
             typedef std::unique_ptr<FakePlanManager> Ptr;

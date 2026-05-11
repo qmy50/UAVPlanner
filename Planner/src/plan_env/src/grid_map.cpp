@@ -1,4 +1,4 @@
-#include "plan_env/grid_map.h"
+#include "plan_env/grid_map_new.h"
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/imgproc.hpp> 
 #include <opencv2/core.hpp> 
@@ -9,7 +9,8 @@
 struct MappingData 
 {
   // main map data, occupancy of each voxel and Euclidean distance
-
+  MappingData() = default;
+  
   std::vector<double> occupancy_buffer_;
   std::vector<char> occupancy_buffer_inflate_;
 
@@ -363,7 +364,134 @@ void GridMap::initMap(ros::NodeHandle &nh)
   // rand_noise2_ = normal_distribution<double>(0, 0.2);
   // random_device rd;
   // eng_ = default_random_engine(rd());
+
+  // 处理动态障碍物
+  dynamic_obs_client_ = node_.serviceClient<onboard_detector::GetDynamicObstacles>("/get_dynamic_obstacles");
+  dynamic_obs_client_.waitForExistence(ros::Duration(5.0));
+  ROS_WARN("WE get the dynamic obstacles service");
+  dynamic_obs_timer_ = node_.createTimer(ros::Duration(0.2), &GridMap::dynamicObstacleTimerCallback, this);
+  predict_obs_pub_ = node_.advertise<geometry_msgs::Point>("/predict_obs_points",10);
+  nh.param<double>("dynamic_obs_timeout", dynamic_obs_timeout_, 0.1);
+  last_dynamic_obs_time_ = ros::Time(0);  
+  dynamic_obs_flag_pub_ = nh.advertise<std_msgs::Bool>("/have_dynamic_obstacle", 1);
+  node_.param("grid_map/use_dwa",use_dwa_,false);
 }
+
+void GridMap::dynamicObstacleTimerCallback(const ros::TimerEvent&) {
+    if (!md_->has_odom_ || !use_dwa_) return;
+
+    geometry_msgs::Point req_pos;
+    req_pos.x = md_->camera_pos_.x();
+    req_pos.y = md_->camera_pos_.y();
+    req_pos.z = md_->camera_pos_.z();
+    srv_.request.current_position = req_pos;
+    srv_.request.range = 5.0;
+
+    bool got_new_obs = false;
+
+    if (dynamic_obs_client_.call(srv_)) {
+        std::vector<onboardDetector::box3D> new_obs;
+        for (size_t i = 0; i < srv_.response.position.size(); ++i) {
+            onboardDetector::box3D box;
+            box.x = srv_.response.position[i].x;
+            box.y = srv_.response.position[i].y;
+            box.z = srv_.response.position[i].z;
+            box.Vx = srv_.response.velocity[i].x;
+            box.Vy = srv_.response.velocity[i].y;
+            box.Vz = srv_.response.velocity[i].z;
+            box.x_width = srv_.response.size[i].x + 0.3;
+            box.y_width = srv_.response.size[i].y + 0.3;
+            box.z_width = srv_.response.size[i].z + 0.3;
+            new_obs.push_back(box);
+        }
+
+        got_new_obs = !new_obs.empty();
+
+        {
+            std::lock_guard<std::mutex> lock(dynamic_obs_mutex_);
+            dynamic_obstacles_ = std::move(new_obs);
+        }
+
+        if (got_new_obs) {
+          ROS_WARN( "got new obs !!!");
+            last_dynamic_obs_time_ = ros::Time::now();
+        }
+
+        ROS_DEBUG_THROTTLE(1.0, "Got %zu dynamic obstacles", dynamic_obstacles_.size());
+    } else {
+        ROS_WARN_THROTTLE(5, "Failed to call /get_dynamic_obstacles service");
+    }
+
+    bool has_dynamic = (ros::Time::now() - last_dynamic_obs_time_).toSec() < dynamic_obs_timeout_;
+    std_msgs::Bool flag_msg;
+    flag_msg.data = has_dynamic;
+    if(has_dynamic)ROS_WARN( "Go to dwa state");
+    dynamic_obs_flag_pub_.publish(flag_msg);
+}
+
+bool GridMap::isPointInDynamicObstacle(const Eigen::Vector3d& pt){
+    std::lock_guard<std::mutex> lock(dynamic_obs_mutex_);
+    for (const auto& box : dynamic_obstacles_) {
+        double half_x = box.x_width * 0.5;
+        double half_y = box.y_width * 0.5;
+        double half_z = box.z_width * 0.5;
+        if (pt.x() > box.x - half_x && pt.x() < box.x + half_x &&
+            pt.y() > box.y - half_y && pt.y() < box.y + half_y &&
+            pt.z() > box.z - half_z && pt.z() < box.z + half_z) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void GridMap::clearDynamicObstaclesFromMap() {
+    std::lock_guard<std::mutex> lock(dynamic_obs_mutex_);
+    for (const auto& box : dynamic_obstacles_) {
+        Eigen::Vector3d min_corner(box.x - box.x_width/2, box.y - box.y_width/2, box.z - box.z_width/2);
+        Eigen::Vector3d max_corner(box.x + box.x_width/2, box.y + box.y_width/2, box.z + box.z_width/2);
+        Eigen::Vector3i idx_min, idx_max;
+        posToIndex(min_corner, idx_min);
+        posToIndex(max_corner, idx_max);
+        boundIndex(idx_min);
+        boundIndex(idx_max);
+        for (int x = idx_min.x(); x <= idx_max.x(); ++x) {
+            for (int y = idx_min.y(); y <= idx_max.y(); ++y) {
+                for (int z = idx_min.z(); z <= idx_max.z(); ++z) {
+                    int idx = toAddress(x, y, z);
+                    // 重置为未知（对数赔率值）
+                    md_->occupancy_buffer_[idx] = mp_.clamp_min_log_ - mp_.unknown_flag_;
+                    // 同时重置膨胀缓冲区
+                    md_->occupancy_buffer_inflate_[idx] = 0;
+                }
+            }
+        }
+    }
+}
+
+std::vector<Eigen::Vector3d> GridMap::getPredictedObs(double predict_time = 1.0, int steps = 5)
+{
+    std::vector<Eigen::Vector3d> predict_points;
+    std::lock_guard<std::mutex> lock(dynamic_obs_mutex_);
+    for (const auto& box : dynamic_obstacles_) {
+        double px = box.x;
+        double py = box.y;
+        double pz = box.z;
+        double vx = box.Vx;
+        double vy = box.Vy;
+        double speed = std::hypot(vx, vy);
+        predict_points.push_back({px,py,pz});
+        if (speed < 0.05) continue;
+        for (int i = 1; i <= steps; ++i) {
+          double dt = predict_time / steps * i;
+          px = px + vx * dt;
+          py = py + vy * dt;
+          predict_points.push_back({px,py,pz});
+        }
+    }
+    return predict_points;
+}
+
+
 
 void GridMap::resetBuffer()
 {
@@ -453,6 +581,13 @@ void GridMap::projectDepthImage()
 
         if (u == 320 && v == 240)
           std::cout << "depth: " << depth << std::endl;
+
+        if(true){
+            if(isPointInDynamicObstacle(proj_pt)){
+              
+              continue;
+            }
+          }
         md_->proj_points_[md_->proj_points_cnt++] = proj_pt;
       }
     }
@@ -508,7 +643,11 @@ void GridMap::projectDepthImage()
           // if (!isInMap(pt_world)) {
           //   pt_world = closetPointInMap(pt_world, md_->camera_pos_);
           // }
-
+          if(true){
+                if(isPointInDynamicObstacle(pt_world)){
+                  continue;
+                }
+          }
           md_->proj_points_[md_->proj_points_cnt++] = pt_world;
 
           // check consistency with last image, disabled...
@@ -883,9 +1022,13 @@ void GridMap::updateOccupancyCallback(const ros::TimerEvent & /*event*/)
   raycastProcess();
   // t3 = ros::Time::now();
 
-  if (md_->local_updated_)
+  if (md_->local_updated_){
     clearAndInflateLocalMap();
-
+    if(use_dwa_){
+      ROS_WARN_THROTTLE(1.0,"use dwa");
+      clearDynamicObstaclesFromMap();
+    }
+  }
   // t4 = ros::Time::now();
 
   // cout << setprecision(7);

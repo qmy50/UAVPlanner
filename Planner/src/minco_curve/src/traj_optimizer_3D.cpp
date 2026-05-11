@@ -5,7 +5,7 @@ PathPlannerSim3D::PathPlannerSim3D(ros::NodeHandle &nh)
         : public_nh(nh), has_map_(false), planned_(false) {
         std::string cloud_topic;
         public_nh.param<std::string>("cloud_topic", cloud_topic, "/grid_map/occupancy_inflate");
-        public_nh.param("/use_real_model",use_real_model_,false);
+        public_nh.param("use_real_model",use_real_model_,false);
         map_sub_ = public_nh.subscribe(cloud_topic, 1, &PathPlannerSim3D::MapCallback, this);
 
         path_pub_ = public_nh.advertise<nav_msgs::Path>("search_path", 1);
@@ -28,23 +28,13 @@ PathPlannerSim3D::PathPlannerSim3D(ros::NodeHandle &nh)
         have_a_star_path_ = false;
         have_minco_waypoints_ = false;
         have_current_traj_ = false;
+        have_minisnap_waypoints_ = false;
         
     }
 
-    // void PathPlannerSim3D::checkAndPlan(const ros::TimerEvent &) {
-    //     if (!has_map_) return;         
-    //     std::vector<Eigen::Vector3d> dummy;
-    //     double current_cost = stc_gen_3d_->getPlanPath(dummy);
-    //     if (current_cost > 0.0 && std::abs(current_cost - last_planned_cost_) > 1e-6) {
-    //         ROS_INFO("A* path and point cloud ready, starting trajectory optimization...");
-    //         Planning();
-    //         last_planned_cost_ = current_cost;
-    //     }
-    // }
-
     void PathPlannerSim3D::setParam(ros::NodeHandle &nh){
         nh.param("manager/max_vel", max_vel_, 2.0);
-        nh.param("manager/max_acc", max_acc_, 0.5);
+        nh.param("manager/max_acc", max_acc_, 1.5);
     }
 
     void PathPlannerSim3D::setEnvironment(const GridMap::Ptr &map){
@@ -69,20 +59,6 @@ PathPlannerSim3D::PathPlannerSim3D(ros::NodeHandle &nh)
                 have_minco_waypoints_ = false;
                 return true;
             }
-            // Eigen::Vector3d right_point = waypoint_position + dir * offset;
-            // if(a_star_->checkOccupancy(right_point)){
-            //     have_a_star_path_ = false;
-            //     have_current_traj_ = false;
-            //     have_minco_waypoints_ = false;
-            //     return true;
-            // }
-            //     Eigen::Vector3d left_point = waypoint_position - dir * offset;
-            // if(a_star_->checkOccupancy(left_point)){
-            //     have_a_star_path_ = false;
-            //     have_current_traj_ = false;
-            //     have_minco_waypoints_ = false;
-            //     return true;
-            // }
         }
         return false;
     }
@@ -93,18 +69,22 @@ PathPlannerSim3D::PathPlannerSim3D(ros::NodeHandle &nh)
         ros::Time start = ros::Time::now();
         current_minco_waypoints_.clear();
         current_a_star_waypoints_.clear();
+        current_minisnap_waypoints_.clear();
         current_traj_.clear();
         have_a_star_path_ = false;
         have_minco_waypoints_=false;
         have_current_traj_=false;
+        have_minisnap_waypoints_ = false;
         
 
         // std::vector<Eigen::Vector3d> path;
         double step_size;
         if(use_real_model_){
             step_size = grid_map_->getResolution() + 0.2;
+            ROS_WARN("USED");
         }else{
             step_size = grid_map_->getResolution() + 0.5;
+             ROS_WARN("DID NOT USED");
         }
         // ROS_INFO("resolution is %f",step_size);
         // ROS_INFO("the start pos is x=%f,y=%f,z=%f",start_position(0),start_position(1),start_position(2));
@@ -147,11 +127,11 @@ PathPlannerSim3D::PathPlannerSim3D(ros::NodeHandle &nh)
         int N = current_a_star_waypoints_.size();
         double lambda_center = 15.0;
         centers.back() = current_a_star_waypoints_.back();
-        std::vector<Eigen::Vector3d> minisnap_waypoints;
+        //std::vector<Eigen::Vector3d> minisnap_waypoints;
         // ROS_INFO("num of hpoly is %ld",hpolys.size());
         // ROS_INFO("num of path is %d",N);
         // ROS_INFO("num of poly is %ld",ploys_vis.size());
-        minisnap_waypoints = minisnap::minisnap_solver(
+        current_minisnap_waypoints_ = minisnap::minisnap_solver(
                     centers,
                     hpolys,   // 每个多面体的半平面矩阵 (a,b,c,d), a*x+b*y+c*z+d <= 0
                     current_a_star_waypoints_,
@@ -161,9 +141,9 @@ PathPlannerSim3D::PathPlannerSim3D(ros::NodeHandle &nh)
         // ROS_INFO("num of minisnap_waypoints is %ld",minisnap_waypoints.size());
         // VisuaWaypoints(minisnap_waypoints, minisnap_pub_);  
 
-
+        have_minisnap_waypoints_ = true;
         std::vector<std::array<Eigen::Vector3d,4>> smooth_control_points;
-        smooth_control_points = minisnap::buildSafeBezierPath(minisnap_waypoints,hpolys);
+        smooth_control_points = minisnap::buildSafeBezierPath(current_minisnap_waypoints_,hpolys);
 
         // std::vector<Eigen::Vector3d> minco_waypoints;
         Eigen::Vector3d last_waypoints = Eigen::Vector3d::Zero();
@@ -194,7 +174,7 @@ PathPlannerSim3D::PathPlannerSim3D(ros::NodeHandle &nh)
          * @note minco traj generation
         */
 
-        pieceNum_ = minisnap_waypoints.size() - 1;
+        pieceNum_ = current_minisnap_waypoints_.size() - 1;
         Eigen::Vector3d start_dir = (current_a_star_waypoints_[1] - current_a_star_waypoints_[0]).normalized();
         Eigen::Vector3d end_dir   = (current_a_star_waypoints_.back() - current_a_star_waypoints_[current_a_star_waypoints_.size()-2]).normalized();
 
@@ -219,17 +199,17 @@ PathPlannerSim3D::PathPlannerSim3D(ros::NodeHandle &nh)
         opt_.setConditions(headState, tailState, pieceNum_);
         Eigen::Matrix<double, 3, -1> inPos(3, pieceNum_ - 1);
         for (int i = 1; i < pieceNum_; ++i)
-            inPos.col(i - 1) = minisnap_waypoints[i];
+            inPos.col(i - 1) = current_minisnap_waypoints_[i];
         ts_ = Eigen::VectorXd::Constant(pieceNum_, 1);
         //ROS_WARN("ts_ segment is %ld",ts_.rows());
         //ROS_WARN("init time segment is %ld",polytime_init_.rows());
 
-        Eigen::VectorXd polytime_init_ = minisnap::timeAllocation(minisnap_waypoints,max_vel_,max_acc_,start_speed,end_speed); 
-        double total_dist=0.0f; 
-        for(int i=1;i<minisnap_waypoints.size();i++){
-            total_dist += (minisnap_waypoints[i]-minisnap_waypoints[i-1]).norm();
-        }
-        ROS_WARN("The init total distance is %f",total_dist);
+        Eigen::VectorXd polytime_init_ = minisnap::timeAllocation(current_minisnap_waypoints_,max_vel_,max_acc_,start_speed,end_speed); 
+        // double total_dist=0.0f; 
+        // for(int i=1;i<minisnap_waypoints.size();i++){
+        //     total_dist += (minisnap_waypoints[i]-minisnap_waypoints[i-1]).norm();
+        // }
+        // ROS_WARN("The init total distance is %f",total_dist);
         ROS_WARN("The init total time is %f",polytime_init_.sum());
         opt_.setParameters(inPos.transpose(), polytime_init_);
 

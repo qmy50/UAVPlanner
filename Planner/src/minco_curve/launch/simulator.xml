@@ -1,7 +1,7 @@
 <launch>
-  <arg name="init_x" value="-12.0"/>
-  <arg name="init_y" value="0.0"/>
-  <arg name="init_z" value="1.0"/> 
+  <arg name="init_x" value="-12"/>
+  <arg name="init_y" value="0"/>
+  <arg name="init_z" value="1"/> 
   <arg name="obj_num" value="1" />
   <arg name="map_size_x_"/>
   <arg name="map_size_y_"/>
@@ -54,7 +54,7 @@
       <param name="map/z_size"     value="$(arg random_map_size_z_)" />
 
       <param name="map/circle_num" value="40"/>        
-      <param name="map/obs_num"    value="100"/>        
+      <param name="map/obs_num"    value="80"/>        
       <param name="map/resolution" value="0.1"/>        
 
       <param name="ObstacleShape/lower_rad" value="1"/>

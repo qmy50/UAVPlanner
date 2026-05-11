@@ -5,10 +5,13 @@
 #include <std_msgs/Empty.h>
 #include <visualization_msgs/Marker.h>
 #include <ros/ros.h>
+#include <tf/tf.h>
 
 using namespace Eigen;
 
 ros::Publisher pos_cmd_pub,pose_cmd_pub;
+
+ros::Publisher cmd_vel_pub_;
 ros::NodeHandle* g_nh = nullptr;
 
 quadrotor_msgs::PositionCommand cmd;
@@ -17,13 +20,16 @@ geometry_msgs::Pose pose_cmd;
 // double vel_gain[3] = {0, 0, 0};
 
 bool receive_traj_ = false;
+bool have_last_cmd_pos_ = false;
 boost::shared_ptr<poly_traj::Trajectory> traj_;
 double traj_duration_;
 ros::Time start_time_;
 int traj_id_;
 ros::Time heartbeat_time_(0);
-Eigen::Vector3d last_pos_;
+Eigen::Vector3d last_cmd_pos_;
 double max_vel_,max_acc_;
+double pos_jump_thresh_;
+double current_yaw_ = 0.0f;
 
 // yaw control
 double last_yaw_, last_yawdot_, slowly_flip_yaw_target_, slowly_turn_to_center_target_;
@@ -68,6 +74,18 @@ void polyTrajCallback(traj_utils::PolyTrajPtr msg)
   start_time_ = msg->start_time;
   traj_duration_ = traj_->getTotalDuration();
   traj_id_ = msg->traj_id;
+
+  // Check position discontinuity: if new traj starts far from last commanded pos
+  if (have_last_cmd_pos_ && pos_jump_thresh_ > 0) {
+    Eigen::Vector3d new_start = traj_->getPos(0.0);
+    double jump_dist = (new_start - last_cmd_pos_).norm();
+    if (jump_dist > pos_jump_thresh_) {
+      ROS_ERROR("[traj_server] POSITION JUMP DETECTED! jump=%.3f m, last_cmd=[%.2f,%.2f,%.2f], new_start=[%.2f,%.2f,%.2f]. Rejecting trajectory!",
+                jump_dist, last_cmd_pos_.x(), last_cmd_pos_.y(), last_cmd_pos_.z(),
+                new_start.x(), new_start.y(), new_start.z());
+      return;  // Reject this trajectory to prevent sudden jump
+    }
+  }
 
   receive_traj_ = true;
 }
@@ -129,7 +147,7 @@ std::pair<double, double> calculate_yaw(double t_cur, Eigen::Vector3d &pos, doub
   last_yaw_ = yaw_yawdot.first;
   last_yawdot_ = yaw_yawdot.second;
 
-  yaw_yawdot.second = yaw_temp;
+  // yaw_yawdot.second = yaw_temp;
   // ROS_WARN_THROTTLE(1.0,"Caculate the yaw angle is %f",yaw);
   return yaw_yawdot;
 }
@@ -209,6 +227,10 @@ void cmdCallback(const ros::TimerEvent &e)
 
   last_yaw_ = cmd.yaw;
 
+  // Track last commanded position for continuity check
+  last_cmd_pos_ = pos;
+  have_last_cmd_pos_ = true;
+
   pos_cmd_pub.publish(cmd);
 
   pose_cmd.position.x = pos(0);
@@ -226,6 +248,38 @@ void cmdCallback(const ros::TimerEvent &e)
       pose_cmd_pub.publish(pose_cmd);
       }
   }
+  if (true) {
+    geometry_msgs::Twist vel_cmd;
+
+    double yaw = current_yaw_;
+    double cos_yaw = cos(yaw);
+    double sin_yaw = sin(yaw);
+
+    // 世界系 -> 机体坐标系 (x向前, y向右, z向上)
+    // 前提是：世界系 x 东, y 北, 偏航角为从北向东旋转（即机头与北向夹角）
+    double v_body_x =  vel(0) * cos_yaw + vel(1) * sin_yaw;
+    double v_body_y = -vel(0) * sin_yaw + vel(1) * cos_yaw;
+    double v_body_z =  vel(2);
+
+    vel_cmd.linear.x = v_body_x;
+    vel_cmd.linear.y = v_body_y;
+    vel_cmd.linear.z = v_body_z;
+
+    // 如果需要同时发送偏航角速率，可取消下面注释
+    // vel_cmd.angular.z = yaw_yawdot.second;  
+
+    cmd_vel_pub_.publish(vel_cmd);
+    ROS_WARN_THROTTLE(1.0, "Send vel command (body frame)");
+  }
+
+}
+
+
+void odometryCallback(const nav_msgs::OdometryConstPtr &msg)
+{
+  tf::Quaternion q(msg->pose.pose.orientation.x,msg->pose.pose.orientation.y,
+                   msg->pose.pose.orientation.z,msg->pose.pose.orientation.w);
+  current_yaw_ = tf::getYaw(q);
 }
 
 int main(int argc, char **argv)
@@ -237,18 +291,24 @@ int main(int argc, char **argv)
   ros::Subscriber poly_traj_sub = nh.subscribe("/fake_planner_node/poly_traj", 10, polyTrajCallback);
 //   ros::Subscriber heartbeat_sub = nh.subscribe("heartbeat", 10, heartbeatCallback);
 
+  ros::Subscriber odom_sub_ = nh.subscribe("/ground_truth/state",10,odometryCallback);
+
   pos_cmd_pub = nh.advertise<quadrotor_msgs::PositionCommand>("/position_cmd", 50);
 
   pose_cmd_pub = nh.advertise<geometry_msgs::Pose>("/pose_cmd", 50);
 
+  cmd_vel_pub_ =nh.advertise<geometry_msgs::Twist>("/cmd_vel", 50);
+
   ros::Timer cmd_timer = nh.createTimer(ros::Duration(0.01), cmdCallback);
 
-  nh.param("manager/max_vel", max_vel_, 2.0);
+  nh.param("manager/max_vel", max_vel_, 1.0);
   nh.param("manager/max_acc", max_acc_, 0.7);
 
   nh.param("traj_server/time_forward", time_forward_, 1.0);
+  nh.param("traj_server/pos_jump_thresh", pos_jump_thresh_, 1.0);  // reject traj if start jumps >1m
   last_yaw_ = 0.0;
   last_yawdot_ = 0.0;
+  have_last_cmd_pos_ = false;
 
   ros::Duration(1.0).sleep();
 

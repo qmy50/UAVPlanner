@@ -19,6 +19,11 @@ namespace fake_planner{
         path_optimizer_rebound_.reset(new PathPlannerSim3D(nh));
         path_optimizer_rebound_->setParam(nh);
         path_optimizer_rebound_->setEnvironment(grid_map_);
+
+        if(true){
+            dwa_controller_.reset(new DWAController);
+            dwa_controller_->setupDWA(nh,grid_map_);
+        }
     }
 
     bool FakePlanManager::EmergencyStop(Eigen::Vector3d stop_pos)
@@ -80,4 +85,61 @@ namespace fake_planner{
             }
         }
     }
+
+    Eigen::Vector3d FakePlanManager::getLookaheadTarget(const Eigen::Vector3d& current_pos,
+                                                        double lookahead_dist) {
+        if(path_optimizer_rebound_->getCurrentMinisnapPoints()){
+            global_path_points_ = path_optimizer_rebound_->current_minisnap_waypoints_;
+        }else{
+            return Eigen::Vector3d(current_pos.x(), current_pos.y(), current_pos.z());
+        }
+        if (global_path_points_.size() < 2) {
+            if (global_data_.traj.getPieceNum() > 0) {
+                double total_dur = global_data_.traj.getTotalDuration();
+                return global_data_.traj.getPos(total_dur);
+            } else {
+                return Eigen::Vector3d(current_pos.x(), current_pos.y(), current_pos.z());
+            }
+        }
+
+        size_t nearest_idx = 0;
+        double min_dist = std::numeric_limits<double>::max();
+        for (size_t i = 0; i < global_path_points_.size(); ++i) {
+            double dx = global_path_points_[i].x() - current_pos.x();
+            double dy = global_path_points_[i].y() - current_pos.y();
+            double dist = std::hypot(dx, dy);
+            if(dist < 0.1){
+                nearest_idx = i;
+                break;
+            }
+            if (dist < min_dist) {
+                min_dist = dist;
+                nearest_idx = i;
+            }
+        }
+
+        double actual_lookahead = lookahead_dist;
+        if (min_dist > 1.0) actual_lookahead += lookahead_dist * 0.5;
+        double accum = 0.0;
+        for (size_t i = nearest_idx; i < global_path_points_.size() - 1; ++i) {
+            double dx = global_path_points_[i+1].x() - global_path_points_[i].x();
+            double dy = global_path_points_[i+1].y() - global_path_points_[i].y();
+            accum += std::hypot(dx, dy);
+            if (accum >= actual_lookahead) {
+                return global_path_points_[i+1];
+            }
+        }
+        return global_path_points_.back();
+    }
+
+    DWAController::Velocity FakePlanManager::getDWAcmd(const std::vector<double>& pose, 
+                                                        double v_c, double w_c,
+                                                        double dynamic_safe_radius) {
+
+        Eigen::Vector3d current_pos(pose[0], pose[1],pose[3]);
+        double lookahead = dwa_controller_->lookahead_dist_ + v_c* 0.3;
+        Eigen::Vector3d target = getLookaheadTarget(current_pos, lookahead);
+        return dwa_controller_->calculateBestVelocity(pose, v_c, w_c, target, dynamic_safe_radius);
+    }
+
 }

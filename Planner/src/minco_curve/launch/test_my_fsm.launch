@@ -5,8 +5,6 @@
   <arg name="map_size_z" value=" 15.0"/>
   <arg name="fixed_frame" default="world"/>
 
-    <arg name="use_real_model" value="false"/>
-
   <!-- topic of your odometry such as VIO or LIO -->
   <arg name="odom_topic" value="/visual_slam/odom" />
 
@@ -71,6 +69,9 @@
     <arg name="point4_z" value="1.0" />
 
     <arg name="drone_id" default="0"/>
+
+
+    <arg name="use_real_model" value="false"/>
     
   </include>
 
@@ -81,11 +82,12 @@
     <remap from="/odom_world" to="$(arg odom_topic)"/>
     <param name="traj_server/time_forward" value="1.0" type="double"/>
     <param name="/publish_pose_cmd" value="false" /> 
+    
   </node>
 
   <node pkg="waypoint_generator" name="waypoint_generator" type="waypoint_generator" output="screen">
     <remap from="~odom" to="$(arg odom_topic)"/>        
-    <remap from="~goal" to="/move_base_simple/goal"/>
+    <remap from="~goal" to="/move_base_simple/goal_mine"/>
     <remap from="~traj_start_trigger" to="/traj_start_trigger" />
     <param name="waypoint_type" value="manual-lonely-waypoint"/>    
   </node>

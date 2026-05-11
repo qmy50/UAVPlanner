@@ -19,6 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
     decomp_util
     plan_env
     path_searching 
+    onboard_detector
 )
 
 # PCL
@@ -46,7 +47,8 @@ add_executable(fake_planner_node
     src/plan_manager.cpp
     src/minisnap.cpp
     src/stc_gen_3D.cpp
-    src/traj_optimizer_3D.cpp)
+    src/traj_optimizer_3D.cpp
+    src/simple_dwa.cpp)
 
 # 链接库（仅链接实际需要的）
 target_link_libraries(fake_planner_node

@@ -16,6 +16,7 @@
   <arg name="max_vel"/>
   <arg name="max_acc"/>
   <arg name="planning_horizon"/>
+  <arg name="use_real_model"/>
 
   <arg name="point_num"/>
   <arg name="point0_x"/>
@@ -80,6 +81,7 @@
     <param name="fsm/waypoint4_x" value="$(arg point4_x)" type="double"/>
     <param name="fsm/waypoint4_y" value="$(arg point4_y)" type="double"/>
     <param name="fsm/waypoint4_z" value="$(arg point4_z)" type="double"/>
+    <param name="fsm/use_dwa" value="false"/>
 
     <param name="grid_map/resolution"      value="0.1" /> 
     <param name="grid_map/map_size_x"   value="$(arg map_size_x_)" /> 
@@ -118,6 +120,7 @@
     <param name="grid_map/show_occ_time"  value="false"/>
     <param name="grid_map/pose_type"     value="2"/>  
     <param name="grid_map/frame_id"      value="world"/>
+    <param name="grid_map/use_dwa"      value="false"/>
 
   <!-- planner manager -->
     <param name="manager/max_vel" value="$(arg max_vel)" type="double"/>
@@ -127,6 +130,8 @@
     <param name="manager/feasibility_tolerance" value="0.05" type="double"/>
     <param name="manager/planning_horizon" value="$(arg planning_horizon)" type="double"/>
     <param name="manager/drone_id" value="$(arg drone_id)" type="int"/>
+
+    <param name="use_real_model" value="$(arg use_real_model)"/>
 
   </node>
 

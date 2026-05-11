@@ -3,6 +3,8 @@
 namespace fake_planner
 {
 
+// bool  have_plan_traj_ = false;
+// bool have_plan_traj_1 = false;
 void FakeReplanFSM::init(ros::NodeHandle &nh)
 {
     node_ = nh;
@@ -44,7 +46,7 @@ void FakeReplanFSM::init(ros::NodeHandle &nh)
 
     if (target_type_ == TARGET_TYPE::MANUAL_TARGET){
       waypoint_list_.clear();
-      trigger_sub_ = node_.subscribe("/move_base_simple/goal", 1, &FakeReplanFSM::triggerCallback, this);
+      trigger_sub_ = node_.subscribe("/move_base_simple/goal_mine", 1, &FakeReplanFSM::triggerCallback, this);
     }
     else if (target_type_ == TARGET_TYPE::PRESET_TARGET)
     {
@@ -64,17 +66,68 @@ void FakeReplanFSM::init(ros::NodeHandle &nh)
     else
       cout << "Wrong target_type_ value! target_type_=" << target_type_ << endl;
       
-  ROS_INFO("FSM initialized, waiting for odom and target.");
-  nh.param("fsm/predict_dt", predict_dt_, 0.1);      
-  nh.param("fsm/use_kalman_filter", use_kalman_filter_, true);
-    
-  if (use_kalman_filter_) {
-      kf_ = ConstantVelocityKalmanFilter(0.2,0.8,0.05,0.05); 
-  }
+    ROS_INFO("FSM initialized, waiting for odom and target.");
+    nh.param("fsm/predict_dt", predict_dt_, 0.1);      
+    nh.param("fsm/use_kalman_filter", use_kalman_filter_, true);
+      
+    if (use_kalman_filter_) {
+        kf_ = ConstantVelocityKalmanFilter(0.2,0.8,0.05,0.05); 
+    }
 
-  // parameters for rising
-  consecutive_replan_cnt_ = 0;
-  rising_traj_generated_ = false;
+    // parameters for rising
+    consecutive_replan_cnt_ = 0;
+    rising_traj_generated_ = false;
+
+    // Odometry jump detection
+    has_last_odom_ = false;
+    odom_jumped_ = false;
+    odom_jump_time_ = ros::Time(0);
+    node_.param("fsm/odom_jump_thresh", odom_jump_thresh_, 0.5);     // >0.5m jump is abnormal
+    node_.param("fsm/odom_jump_cooldown", odom_jump_cooldown_, 0.5); // wait 0.5s after jump
+
+    // DWA
+    node_.param("fsm/use_dwa",use_dwa_,false);
+    dynamic_obs_sub_ = node_.subscribe("/have_dynamic_obstacle", 1, &FakeReplanFSM::dynamicObstacleCallback, this);
+    cmd_vel_pub_ = node_.advertise<geometry_msgs::Twist>("/cmd_vel", 10);
+    have_dynamic_obs_ = false;
+    current_yaw_ = 0.0;
+    current_angular_z_ = 0.0;
+
+    // //class
+    // plan_sub_ = nh.subscribe("/plan_trajectory", 1, &FakeReplanFSM::planCallback, this);
+}
+
+// void FakeReplanFSM::planCallback(const std_msgs::Bool& msg){
+//   have_plan_traj_ = msg.data;
+// }
+
+void FakeReplanFSM::dynamicObstacleCallback(const std_msgs::Bool::ConstPtr &msg)
+{
+    if(!use_dwa_)return;
+    have_dynamic_obs_ = msg->data;
+
+    if (have_dynamic_obs_) {
+        if (exec_state_ != DWA && exec_state_ != EMERGENCY_STOP && exec_state_ != RISING) {
+            have_traj_ = false;
+            changeFSMExecState(DWA, "Dynamic obstacle detected, switch to DWA");
+        }
+    } else {
+        if (exec_state_ == DWA) {
+            changeFSMExecState(WAIT_TRAJ, "No dynamic obstacle, resume trajectory tracking");
+            if (!waypoint_list_.empty() && current_wp_idx_ < (int)waypoint_list_.size()) {
+                trigger_ = true;
+                have_traj_ = false;
+            }
+        }
+    }
+}
+
+void FakeReplanFSM::publishDWACommand(double v, double w)
+{
+    geometry_msgs::Twist cmd;
+    cmd.linear.x = v;
+    cmd.angular.z = w;
+    cmd_vel_pub_.publish(cmd);
 }
 
 void FakeReplanFSM::execFSMCallback(const ros::TimerEvent &e)
@@ -95,6 +148,15 @@ void FakeReplanFSM::execFSMCallback(const ros::TimerEvent &e)
 
       case WAIT_TRAJ:{
         if(! trigger_ || ! have_odom_) goto force_return;
+          // Skip replanning during odom jump cooldown period
+          if (odom_jumped_ && (ros::Time::now() - odom_jump_time_).toSec() < odom_jump_cooldown_) {
+            ROS_WARN_THROTTLE(0.2, "Odom jump cooldown, waiting %.1fs before replanning",
+                              odom_jump_cooldown_ - (ros::Time::now() - odom_jump_time_).toSec());
+            goto force_return;
+          }
+          if (odom_jumped_) {
+            odom_jumped_ = false;  // cooldown passed, clear flag
+          }
           if(!waypoint_list_.empty() && current_wp_idx_ < (int)waypoint_list_.size()){
             bool ok = planToTarget(waypoint_list_[current_wp_idx_]);
             if (ok) {
@@ -133,18 +195,18 @@ void FakeReplanFSM::execFSMCallback(const ros::TimerEvent &e)
             ROS_INFO_THROTTLE(1.0,"jump to exec the current traj");
               // changeFSMExecState(WAIT_TRAJ,"plan to waypoint");
                 static ros::Time last_replan_time = ros::Time::now();
-              if (planner_manager_->needRePlan() && (ros::Time::now() - last_replan_time).toSec()>0.0) {   
+              if (planner_manager_->needRePlan() && (ros::Time::now() - last_replan_time).toSec()>0.02) {   
                 ROS_WARN_THROTTLE(1.0,"Need Replan");
                 if((ros::Time::now() - last_replan_time).toSec()<0.04){
                     consecutive_replan_cnt_++;
-                }else if((ros::Time::now() - last_replan_time).toSec() > 0.1){
+                }else if((ros::Time::now() - last_replan_time).toSec() > 1.2){
                     consecutive_replan_cnt_ = 0;
                 }
                 last_replan_time = ros::Time::now();
                 ROS_WARN("Current consecutive_replan_cnt = %d",consecutive_replan_cnt_);
                 if (consecutive_replan_cnt_ >= 30) {
                   rise_target_ = odom_pos_;
-                  rise_target_.z() += 5.0;
+                  rise_target_.z() += 2.0;
                   changeFSMExecState(RISING, "Too many replans, rising");
                 }else{
                   have_traj_ = false;
@@ -180,7 +242,41 @@ void FakeReplanFSM::execFSMCallback(const ros::TimerEvent &e)
       }
         break;
     }
+case DWA: {
+    if (!have_dynamic_obs_ || waypoint_list_.empty()) {
+        changeFSMExecState(WAIT_TRAJ, "DWA -> WAIT_TRAJ (no obstacle or no target)");
+        ROS_WARN("NO OBS or NO TARGET");
+        break;
+    }
+    if(odom_vel_.norm() < 0.05){
+        changeFSMExecState(WAIT_TRAJ, "DWA -> WAIT_TRAJ (no obstacle or no target)");
+        ROS_WARN("TOO SLOW");
+        break;
+    }
 
+    std::vector<double> pose = {odom_pos_.x(), odom_pos_.y(),  current_yaw_, odom_pos_.z()};
+    double v_c = odom_vel_.norm(); 
+    double dynamic_safe_radius = 0.6;
+    ROS_WARN("STATE 1");
+    auto velocity = planner_manager_->getDWAcmd(pose, v_c, current_angular_z_,dynamic_safe_radius);
+    ROS_WARN("We got the vel cmd !");
+    publishDWACommand(velocity.v,velocity.w);
+
+    if ((odom_pos_ - waypoint_list_[current_wp_idx_]).norm() < replan_thresh_) {
+        if (current_wp_idx_ < (int)waypoint_list_.size() - 1) {
+            current_wp_idx_++;
+            have_traj_ = false;
+            changeFSMExecState(WAIT_TRAJ, "DWA reached waypoint, go next");
+        } else {
+            ROS_INFO("Final target reached in DWA mode");
+            touch_goal_ = true;
+            trigger_ = false;
+            have_traj_ = false;
+            changeFSMExecState(WAIT_TRAJ, "DWA finished");
+        }
+    }
+        break;
+    }
       default:
         break;
       }
@@ -200,7 +296,9 @@ bool FakeReplanFSM::planToTarget(const Eigen::Vector3d &target_pt) {
     //     start_pt = odom_pos_;
     //     start_vel = odom_vel_;
     // }
+
     start_pt = odom_pos_ + odom_vel_ * predict_dt_;
+    ROS_WARN("STARTPOINT x = %f,y = %f,z = %f",start_pt[0],start_pt[1],start_pt[2]);
     start_vel = odom_vel_;
     start_vel = start_vel * 0.5;
     
@@ -228,35 +326,6 @@ bool FakeReplanFSM::planToTarget(const Eigen::Vector3d &target_pt) {
     return success;
 }
 
-// bool FakeReplanFSM::planToTarget(const Eigen::Vector3d &target_pt)
-// {
-//   Eigen::Vector3d start_pt = odom_pos_;
-//   Eigen::Vector3d start_vel = odom_vel_;
-
-//   Eigen::Vector3d start_acc = odom_acc_;  
-
-//   Eigen::Vector3d end_vel = Eigen::Vector3d{2.0,0.0,0.0};
-//   Eigen::Vector3d end_acc = Eigen::Vector3d::Zero();
-
-//   bool success = false;
-//   if(current_wp_idx_ == waypoint_list_.size() - 1){
-//       success = planner_manager_->planGlobalTraj(start_pt,start_vel,start_acc,target_pt,target_vel_,target_acc_);
-//     }
-//   else{
-//       success = planner_manager_->planGlobalTraj(start_pt,start_vel,start_acc,target_pt,end_vel,end_acc);
-//   }
-
-//   if (success)
-//   {
-//     traj_utils::PolyTraj poly_msg;
-//     planner_manager_->polyTraj2ROSMsg(poly_msg);
-//     publishTraj(poly_msg);
-//     have_traj_ = true;
-//   }
-
-//   return success;
-// }
-
 void FakeReplanFSM::checkCollisionCallback(const ros::TimerEvent &e)
 {
   if (exec_state_ == EMERGENCY_STOP) return;
@@ -279,7 +348,7 @@ void FakeReplanFSM::triggerCallback(const nav_msgs::PathPtr &msg)
     changeFSMExecState(WAIT_TRAJ, "Resume from emergency stop");
   }
   if(have_traj_){
-    ROS_WARN("On out way to current target, set goal later");
+    ROS_WARN("On our way to current target, set goal later");
     return;
   }
     target_pt_ << msg -> poses[0].pose.position.x,
@@ -294,18 +363,46 @@ void FakeReplanFSM::triggerCallback(const nav_msgs::PathPtr &msg)
 
 void FakeReplanFSM::odometryCallback(const nav_msgs::OdometryConstPtr &msg)
 {
-  odom_pos_(0) = msg->pose.pose.position.x;
-  odom_pos_(1) = msg->pose.pose.position.y;
-  odom_pos_(2) = msg->pose.pose.position.z;
+  Eigen::Vector3d new_pos;
+  new_pos(0) = msg->pose.pose.position.x;
+  new_pos(1) = msg->pose.pose.position.y;
+  new_pos(2) = msg->pose.pose.position.z;
+
+  // Detect odometry jump (VIO/SLAM relocalization)
+  if (has_last_odom_ && have_odom_) {
+    double jump_dist = (new_pos - last_odom_pos_).norm();
+    // Estimate max expected displacement from velocity (dt ~ 0.02s at 50Hz odom)
+    double max_expected = odom_vel_.norm() * 0.1 + 0.1; // velocity * time + margin
+    if (jump_dist > odom_jump_thresh_ && jump_dist > max_expected) {
+      ROS_ERROR("ODOM JUMP DETECTED! jump=%.3f m, last_pos=[%.2f,%.2f,%.2f], new_pos=[%.2f,%.2f,%.2f]",
+                jump_dist, last_odom_pos_.x(), last_odom_pos_.y(), last_odom_pos_.z(),
+                new_pos.x(), new_pos.y(), new_pos.z());
+      odom_jumped_ = true;
+      odom_jump_time_ = ros::Time::now();
+      // Reset Kalman filter on jump to avoid stale state
+      if (use_kalman_filter_) {
+        kf_ = ConstantVelocityKalmanFilter(0.2, 0.8, 0.05, 0.05);
+      }
+    }
+  }
+
+  last_odom_pos_ = new_pos;
+  has_last_odom_ = true;
+
+  odom_pos_ = new_pos;
   odom_vel_(0) = msg->twist.twist.linear.x;
   odom_vel_(1) = msg->twist.twist.linear.y;
   odom_vel_(2) = msg->twist.twist.linear.z;
+
+  tf::Quaternion q(msg->pose.pose.orientation.x,msg->pose.pose.orientation.y,
+                   msg->pose.pose.orientation.z,msg->pose.pose.orientation.w);
+  current_yaw_ = tf::getYaw(q);
+  current_angular_z_ = msg->twist.twist.angular.z;
+
   odom_acc_.setZero();
   have_odom_ = true;
-  // ROS_WARN_THROTTLE(0.5,"Current speed is : %f",odom_vel_.norm());
+
   if (use_kalman_filter_) {
-      // 使用当前观测更新滤波器
-      ROS_WARN_THROTTLE(2.0,"USE Kalman filter");
       double t = ros::Time::now().toSec();
       kf_.update(odom_pos_, odom_vel_, t);
   }
@@ -318,7 +415,7 @@ void FakeReplanFSM::publishTraj(const traj_utils::PolyTraj &traj_msg)
 
 void FakeReplanFSM::printFSMExecState()
 {
-  const char *state_names[] = {"INIT", "WAIT_TRAJ", "EXEC_TRAJ", "RISING","EMERGENCY_STOP"};
+  const char *state_names[] = {"INIT", "WAIT_TRAJ", "EXEC_TRAJ", "RISING","DWA","EMERGENCY_STOP"};
   ROS_INFO("FSM State: %s", state_names[exec_state_]);
 }
 

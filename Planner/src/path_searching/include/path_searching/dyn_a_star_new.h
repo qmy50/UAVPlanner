@@ -5,7 +5,7 @@
 #include <ros/ros.h>
 #include <ros/console.h>
 #include <Eigen/Dense>
-#include <plan_env/grid_map.h>
+#include <plan_env/grid_map_new.h>
 #include <queue>
 
 constexpr double inf = 1 >> 20;

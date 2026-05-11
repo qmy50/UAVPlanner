@@ -10,7 +10,7 @@
 #include <traj_utils/DataDisp.h>
 #include <plan_manager.h>
 #include <traj_utils/PolyTraj.h>
-#include <plan_env/grid_map.h>
+#include <plan_env/grid_map_new.h>
 
 using std::vector;
 
@@ -25,9 +25,9 @@ public:
                                  double process_noise_vel = 0.3,
                                  double measure_noise_pos = 0.05,
                                  double measure_noise_vel = 0.05) {
-        // 状态转移矩阵 F (初始占位，实际 dt 会动态更新)
+        // 状态转移矩阵 F
         F_.setIdentity();
-        // 测量矩阵 H (直接测量全部状态)
+        // 测量矩阵 H 
         H_.setIdentity();
         // 过程噪声协方差 Q
         Q_.setIdentity();
@@ -39,14 +39,13 @@ public:
         R_.block<3,3>(3,3) *= measure_noise_vel;
         // 初始状态协方差 P
         P_.setIdentity();
-        P_.block<3,3>(0,0) *= 10.0;   // 位置初始不确定性较大
-        P_.block<3,3>(3,3) *= 10.0;   // 速度初始不确定性较大
+        P_.block<3,3>(0,0) *= 10.0; 
+        P_.block<3,3>(3,3) *= 10.0;  
         
         is_initialized_ = false;
         last_time_sec_ = 0.0;
     }
 
-    // 初始化滤波器（使用第一帧测量）
     void init(const Eigen::Vector3d& pos, const Eigen::Vector3d& vel, double timestamp_sec) {
         x_.head<3>() = pos;
         x_.tail<3>() = vel;
@@ -100,7 +99,7 @@ private:
     Eigen::MatrixXd F_{6,6}, H_{6,6}, Q_{6,6}, R_{6,6}, P_{6,6};
     Eigen::VectorXd x_{6};
     bool is_initialized_;
-    double last_time_sec_;   // 上一次更新的时间戳（秒）
+    double last_time_sec_;  
 };
 
 class FakeReplanFSM
@@ -120,6 +119,7 @@ private:
       WAIT_TRAJ,   
       EXEC_TRAJ,    
       RISING,
+      DWA,
       EMERGENCY_STOP  
     };
 
@@ -151,12 +151,20 @@ private:
 
   Eigen::Vector3d odom_pos_, odom_vel_, odom_acc_;  
   Eigen::Vector3d target_pt_, target_vel_,target_acc_;                      
+
+  // Odometry jump detection
+  Eigen::Vector3d last_odom_pos_;
+  bool has_last_odom_;
+  double odom_jump_thresh_;
+  bool odom_jumped_;           // flag: odom just jumped, wait before replanning
+  ros::Time odom_jump_time_;   // when the jump happened
+  double odom_jump_cooldown_;  // seconds to wait after a jump before replanning
   std::vector<Eigen::Vector3d> waypoint_list_;          
   int current_wp_idx_;                              
   
   ros::NodeHandle node_;
   ros::Timer exec_timer_, safety_timer_;
-  ros::Subscriber odom_sub_, waypoint_sub_, trigger_sub_, mandatory_stop_sub_;
+  ros::Subscriber odom_sub_, waypoint_sub_, trigger_sub_, mandatory_stop_sub_,plan_sub_;
   ros::Publisher poly_traj_pub_;
 
   void execFSMCallback(const ros::TimerEvent &e);
@@ -175,6 +183,19 @@ private:
 //   void mandatoryStopCallback(const std_msgs::Empty &msg);
 
   void publishTraj(const traj_utils::PolyTraj &traj_msg);
+
+  // DWA 相关
+  ros::Subscriber dynamic_obs_sub_;
+  bool have_dynamic_obs_,use_dwa_;
+  double current_yaw_,current_angular_z_;
+  ros::Publisher cmd_vel_pub_;
+
+  void dynamicObstacleCallback(const std_msgs::Bool::ConstPtr &msg);
+  void publishDWACommand(double v, double w);  // 发布 DWA 控制指令
+
+  //class
+  //void planCallback(const std_msgs::Bool& msg);
+
 };
 
 }// namespace fake_planner

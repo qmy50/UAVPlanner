@@ -21,6 +21,7 @@
   <depend>decomp_util</depend>
   <depend>plan_env</depend>
   <depend>path_searching</depend>
+  <depend>onboard_detector</depend>
 
     <export>
     </export>
