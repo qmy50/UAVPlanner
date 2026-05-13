@@ -16,7 +16,7 @@
 
 该方案适用于未知环境下的无人机自主导航、动态避障与平滑轨迹跟踪任务。
 
-### 项目测试于UBUNTU20.04 ROS1 noetic
+### 项目测试于UBUNTU20.04 ROS1 noetic，并使用OSQP 0.6.3 和OSQP-eigen 0.8.0
 
 ## 二. Quick Start：
 
