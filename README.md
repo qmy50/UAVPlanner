@@ -141,18 +141,11 @@ https://github.com/user-attachments/assets/85a1c213-504a-4d8b-ad33-5cb47a72ddd9
 
 可使用手动指定航点模式与使用预设航点两种模式执行多机rviz仿真
 
-
-
 https://github.com/user-attachments/assets/aa1ed226-2d7f-459d-b6bd-d0f6985ddaa6
-
-
 
 https://github.com/user-attachments/assets/c31f04aa-4187-42e2-aada-c58510e21752
 
-
-
-
-运行方式为启动swarm的luanch为文件
+运行方式为启动swarm的launch为文件
 ```
 roslaunch minco_curve rviz.launch
 ```
