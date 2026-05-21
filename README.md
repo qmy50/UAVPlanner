@@ -145,7 +145,7 @@ https://github.com/user-attachments/assets/aa1ed226-2d7f-459d-b6bd-d0f6985ddaa6
 
 https://github.com/user-attachments/assets/c31f04aa-4187-42e2-aada-c58510e21752
 
-运行方式为启动swarm的launch为文件
+运行方式为启动swarm的launch文件
 ```
 roslaunch minco_curve rviz.launch
 ```
@@ -155,9 +155,7 @@ roslaunch minco_curve swarm.launch
 
 
 ## 七. Reference：
-[1]. 规划器整体建构及轨迹跟踪与动态环境更新，a*搜索等模块参考/使用 ego planner 
-
-链接为：https://github.com/ZJU-FAST-Lab/ego-planner
+[1]. 规划器整体结构及动态环境更新，a*搜索等模块参考/使用 ego planner 链接为：https://github.com/ZJU-FAST-Lab/ego-planner
 
 [2]. 多机规划参考 ego swarm 链接为：https://github.com/ZJU-FAST-Lab/ego-planner-swarm
 
