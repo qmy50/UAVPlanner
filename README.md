@@ -16,6 +16,8 @@
 
 该方案适用于未知环境下的无人机自主导航、动态避障与平滑轨迹跟踪任务。
 
+### 项目测试于UBUNTU20.04 ROS1 noetic，并使用OSQP 0.6.3 和OSQP-eigen 0.8.0
+
 ## 二. Quick Start：
 
 在rviz中进行纯数字仿真
@@ -129,20 +131,43 @@ https://github.com/user-attachments/assets/976ccb1e-e4e9-4f59-be26-1e8c62647dec
 roslaunch onboard_detector run_detector.launch
 ```
 
-## 六. Reference：
-[1]. 规划器整体建构及轨迹跟踪与动态环境更新，a*搜索等模块参考/使用 ego planner 
 
-链接为：https://github.com/ZJU-FAST-Lab/ego-planner
+https://github.com/user-attachments/assets/85a1c213-504a-4d8b-ad33-5cb47a72ddd9
 
-[2]. 三维安全走廊生成采用开源库DecompROS，链接为：https://github.com/sikang/DecompROS
+## 六. 多机支持
 
-[3]. 将STC与minco相结合参考了二维规划器FlowCore，链接为：https://github.com/Photin1a/FlowCore
+依据ego swarm多机路径规划框架进行修改，使用UDP广播各个无人机规划轨迹，并依据无人机编号设置优先级，每一架无人机将收到的高优先级无人机轨迹所占据的栅格设置为障碍物，
+从而完成过无人机避障
 
-[4]. 加入安全走廊硬约束的离散minisnap QP求解，参考链接为：https://github.com/Gerrylgr/trajectory_optimization
+可使用手动指定航点模式与使用预设航点两种模式执行多机rviz仿真
 
-[5]. PX4仿真部分使用XTdroen，链接为： https://gitee.com/robin_shaun/XTDrone
+https://github.com/user-attachments/assets/aa1ed226-2d7f-459d-b6bd-d0f6985ddaa6
 
-[6]. 基于意图预测MPC机器人无人机导航动态避障，链接为： https://github.com/Zhefan-Xu/Intent-MPC
+https://github.com/user-attachments/assets/c31f04aa-4187-42e2-aada-c58510e21752
 
-[7]. DWA控制器参考链接为: https://github.com/QnJiu/ROS2-DWA-Autonomous-Navigation
+运行方式为启动swarm的launch文件
+```
+roslaunch minco_curve rviz.launch
+```
+```
+roslaunch minco_curve swarm.launch
+```
+
+
+## 七. Reference：
+[1]. 规划器整体结构及动态环境更新，a*搜索等模块参考/使用 ego planner 链接为：https://github.com/ZJU-FAST-Lab/ego-planner
+
+[2]. 多机规划参考 ego swarm 链接为：https://github.com/ZJU-FAST-Lab/ego-planner-swarm
+
+[3]. 三维安全走廊生成采用开源库DecompROS，链接为：https://github.com/sikang/DecompROS
+
+[4]. 将STC与minco相结合参考了二维规划器FlowCore，链接为：https://github.com/Photin1a/FlowCore
+
+[5]. 加入安全走廊硬约束的离散minisnap QP求解，参考链接为：https://github.com/Gerrylgr/trajectory_optimization
+
+[6]. PX4仿真部分使用XTdroen，链接为： https://gitee.com/robin_shaun/XTDrone
+
+[7]. 基于意图预测MPC机器人无人机导航动态避障，链接为： https://github.com/Zhefan-Xu/Intent-MPC
+
+[8]. DWA控制器参考链接为: https://github.com/QnJiu/ROS2-DWA-Autonomous-Navigation
 
