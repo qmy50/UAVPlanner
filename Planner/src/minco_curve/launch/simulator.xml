@@ -1,7 +1,7 @@
 <launch>
-  <arg name="init_x" value="-12"/>
-  <arg name="init_y" value="0"/>
-  <arg name="init_z" value="1"/> 
+  <arg name="init_x"/>
+  <arg name="init_y"/>
+  <arg name="init_z"/> 
   <arg name="obj_num" value="1" />
   <arg name="map_size_x_"/>
   <arg name="map_size_y_"/>

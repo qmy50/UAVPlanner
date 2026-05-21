@@ -25,9 +25,9 @@ public:
                                  double process_noise_vel = 0.3,
                                  double measure_noise_pos = 0.05,
                                  double measure_noise_vel = 0.05) {
-        // 状态转移矩阵 F
+        // 状态转移矩阵 F (初始占位，实际 dt 会动态更新)
         F_.setIdentity();
-        // 测量矩阵 H 
+        // 测量矩阵 H (直接测量全部状态)
         H_.setIdentity();
         // 过程噪声协方差 Q
         Q_.setIdentity();
@@ -39,13 +39,14 @@ public:
         R_.block<3,3>(3,3) *= measure_noise_vel;
         // 初始状态协方差 P
         P_.setIdentity();
-        P_.block<3,3>(0,0) *= 10.0; 
-        P_.block<3,3>(3,3) *= 10.0;  
+        P_.block<3,3>(0,0) *= 10.0;   // 位置初始不确定性较大
+        P_.block<3,3>(3,3) *= 10.0;   // 速度初始不确定性较大
         
         is_initialized_ = false;
         last_time_sec_ = 0.0;
     }
 
+    // 初始化滤波器（使用第一帧测量）
     void init(const Eigen::Vector3d& pos, const Eigen::Vector3d& vel, double timestamp_sec) {
         x_.head<3>() = pos;
         x_.tail<3>() = vel;
@@ -99,7 +100,7 @@ private:
     Eigen::MatrixXd F_{6,6}, H_{6,6}, Q_{6,6}, R_{6,6}, P_{6,6};
     Eigen::VectorXd x_{6};
     bool is_initialized_;
-    double last_time_sec_;  
+    double last_time_sec_;   // 上一次更新的时间戳（秒）
 };
 
 class FakeReplanFSM
@@ -130,9 +131,9 @@ private:
     };
 
   FakePlanManager::Ptr planner_manager_;
-    ConstantVelocityKalmanFilter kf_;
-    double predict_dt_;
-    bool use_kalman_filter_;
+  ConstantVelocityKalmanFilter kf_;
+  double predict_dt_;
+  bool use_kalman_filter_;
  
   double replan_thresh_;          
   double planning_horizen_;      
@@ -180,6 +181,7 @@ private:
   void odometryCallback(const nav_msgs::OdometryConstPtr &msg);
   //void triggerCallback(const geometry_msgs::PoseStampedPtr &msg);
   void triggerCallback(const nav_msgs::PathPtr &msg);
+  void triggerCallback(const quadrotor_msgs::GoalSetConstPtr &msg);
 //   void mandatoryStopCallback(const std_msgs::Empty &msg);
 
   void publishTraj(const traj_utils::PolyTraj &traj_msg);
@@ -194,7 +196,17 @@ private:
   void publishDWACommand(double v, double w);  // 发布 DWA 控制指令
 
   //class
-  //void planCallback(const std_msgs::Bool& msg);
+  void planCallback(const std_msgs::Bool& msg);
+
+  // swarm
+  // void RecvBroadcastMINCOTrajCallback(const traj_utils::MINCOTrajConstPtr &msg);
+  void RecvBroadcastMINCOTrajCallback(const traj_utils::MINCOTrajConstPtr &msg);
+  //void VisuaWaypoints(const std::vector<Eigen::Vector3d> &traj, ros::Publisher marker_pub);
+  void VisuaWaypoints(const Eigen::MatrixXd &traj, ros::Publisher marker_pub);
+  bool have_recv_pre_agent_;
+  ros::Publisher checkpoints_pub_ ,broadcast_ploytraj_pub_;
+  ros::Subscriber broadcast_ploytraj_sub_;
+  double des_clearence_;
 
 };
 

@@ -1,6 +1,8 @@
 #ifndef _GRID_MAP_NEW_H
 #define _GRID_MAP_NEW_H
 
+#include <unordered_set>
+#include <unordered_map>
 #include <memory>
 #include <Eigen/Eigen>
 #include <Eigen/StdVector>
@@ -17,6 +19,8 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/point_cloud2_iterator.h>
 
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/approximate_time.h>
@@ -98,6 +102,7 @@ public:
   int getOccupancy(Eigen::Vector3d pos);
   int getOccupancy(Eigen::Vector3i id);
   int getInflateOccupancy(Eigen::Vector3d pos);
+  int getInflateOccupancy(Eigen::Vector3d pos ,const int& drone_id);
 
   void boundIndex(Eigen::Vector3i& id);
   bool isUnknown(const Eigen::Vector3i& id);
@@ -178,13 +183,26 @@ private:
   void dynamicObstacleTimerCallback(const ros::TimerEvent&);
   bool isPointInDynamicObstacle(const Eigen::Vector3d& pt);
   void clearDynamicObstaclesFromMap();
-
   uniform_real_distribution<double> rand_noise_;
   normal_distribution<double> rand_noise2_;
   default_random_engine eng_;
-  
-  public:
- std::vector<Eigen::Vector3d> getPredictedObs(double predict_time, int steps);
+
+
+  // swarm避障相关
+  std::unordered_map<int, std::unordered_set<int>> temp_obs_by_id_; // key: drone_id, value: 该无人机产生的体素地址集合
+  mutable std::mutex temp_obs_mutex_;
+  double temp_obs_radius_;
+  ros::Publisher temp_obs_pub_;
+    
+public:
+  void addTemporaryObstacles(int drone_id, const Eigen::MatrixXd &points, double radius);
+  void clearTemporaryObstacles(int drone_id);
+  void clearAllTemporaryObstacles();
+  std::unordered_set<int> getAllTempObsAddresses() const;
+  void publishTempObstacles(const ros::Publisher& pub, const std::string& frame_id, const ros::Time& stamp);
+  Eigen::Vector3i addressToIndex(int addr) const;
+
+  std::vector<Eigen::Vector3d> getPredictedObs(double predict_time , int step);
 
 
 };

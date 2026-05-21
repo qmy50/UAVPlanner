@@ -19,25 +19,17 @@ namespace fake_planner{
     poly_traj::Trajectory traj;
     double global_start_time; // world time
     double duration;
+    int drone_id;
+  };
 
-    /* Global traj time. 
-       The corresponding global trajectory time of the current local target.
-       Used in local target selection process */
-    double glb_t_of_lc_tgt;
-    /* Global traj time. 
-       The corresponding global trajectory time of the last local target.
-       Used in initial-path-from-last-optimal-trajectory generation process */
-    double last_glb_t_of_lc_tgt;
-
-    void setGlobalTraj(const poly_traj::Trajectory &trajectory, const double &world_time)
-    {
-      traj = trajectory;
-      duration = trajectory.getTotalDuration();
-      global_start_time = world_time;
-      glb_t_of_lc_tgt = world_time;
-      last_glb_t_of_lc_tgt = -1.0;
-
-    }
+  struct swarmTrajData
+  {
+    
+    poly_traj::Trajectory traj;
+    double start_time; // world time
+    double duration;
+    int drone_id;
+    double des_clearance;
   };
 
   struct PlanParameters
@@ -55,6 +47,27 @@ namespace fake_planner{
     double time_search_ = 0.0;
     double time_optimize_ = 0.0;
     double time_adjust_ = 0.0;
+  };
+
+  typedef std::vector<swarmTrajData> SwarmTrajData;
+
+  class TrajContainer
+  {
+  public:
+    GlobalTrajData global_traj;
+    SwarmTrajData swarm_traj;
+
+    TrajContainer() {}
+    ~TrajContainer() {}
+
+    void setGlobalTraj(const poly_traj::Trajectory &trajectory, const double &world_time,const int& drone_id)
+    {
+      global_traj.traj = trajectory;
+      global_traj.duration = trajectory.getTotalDuration();
+      global_traj.global_start_time = world_time;
+      global_traj.drone_id = drone_id;
+
+    }
   };
 
 }// namespace fake_planner

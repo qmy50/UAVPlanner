@@ -81,14 +81,15 @@ private:
 	std::priority_queue<GridNodePtr, std::vector<GridNodePtr>, NodeComparator> openSet_;
 
 	int rounds_{0};
+	
 
 public:
 	typedef std::shared_ptr<AStar> Ptr;
-
-	AStar(){};
+	int drone_id_;
+	AStar(const int& id){drone_id_ = id;};
 	~AStar();
 
-	inline int checkOccupancy(const Eigen::Vector3d &pos) { return grid_map_->getInflateOccupancy(pos); }
+	inline int checkOccupancy(const Eigen::Vector3d &pos, const int& drone_id) { return grid_map_->getInflateOccupancy(pos,drone_id); }
 
 	void initGridMap(GridMap::Ptr occ_map, const Eigen::Vector3i pool_size);
 

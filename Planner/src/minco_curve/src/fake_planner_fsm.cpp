@@ -40,16 +40,21 @@ void FakeReplanFSM::init(ros::NodeHandle &nh)
     exec_timer_ = node_.createTimer(ros::Duration(0.02), &FakeReplanFSM::execFSMCallback, this);
     // safety_timer_ = node_.createTimer(ros::Duration(0.05), &FakeReplanFSM::checkCollisionCallback, this);
 
-    odom_sub_ = node_.subscribe("/odom_world", 10, &FakeReplanFSM::odometryCallback, this);
+    odom_sub_ = node_.subscribe("odom_world", 10, &FakeReplanFSM::odometryCallback, this);
     // trigger_sub_ = node_.subscribe("trigger", 1, &FakeReplanFSM::triggerCallback, this);
-    poly_traj_pub_ = node_.advertise<traj_utils::PolyTraj>("/fake_planner_node/poly_traj", 10);
+    poly_traj_pub_ = node_.advertise<traj_utils::PolyTraj>("planning/trajectory", 10);
 
     if (target_type_ == TARGET_TYPE::MANUAL_TARGET){
       waypoint_list_.clear();
-      trigger_sub_ = node_.subscribe("/move_base_simple/goal_mine", 1, &FakeReplanFSM::triggerCallback, this);
+      //std::string goal_topic = "/drone_" + std::to_string(planner_manager_->pp_.drone_id) + "_waypoint_generator/move_base_simple/goal_mine";
+      //ROS_WARN("The goal topic is :%s",goal_topic.c_str());
+      std::string goal_topic = "/goal_user2brig";
+      trigger_sub_ = node_.subscribe(goal_topic, 1, &FakeReplanFSM::triggerCallback, this);
+      ROS_WARN("USE MANUAL MODE!!!");
     }
     else if (target_type_ == TARGET_TYPE::PRESET_TARGET)
     {
+      ROS_WARN("USE AUTO MODE!!!");
       waypoint_list_.clear();
       for (int i = 0; i < waypoint_num_; i++) {
           Eigen::Vector3d wp(waypoints_[i][0], waypoints_[i][1], waypoints_[i][2]);
@@ -93,8 +98,15 @@ void FakeReplanFSM::init(ros::NodeHandle &nh)
     current_yaw_ = 0.0;
     current_angular_z_ = 0.0;
 
-    // //class
-    // plan_sub_ = nh.subscribe("/plan_trajectory", 1, &FakeReplanFSM::planCallback, this);
+    //swarm
+    broadcast_ploytraj_pub_ = nh.advertise<traj_utils::MINCOTraj>("planning/broadcast_traj_send", 10);
+    broadcast_ploytraj_sub_ = nh.subscribe<traj_utils::MINCOTraj>("planning/broadcast_traj_recv", 100,
+                                                              &FakeReplanFSM::RecvBroadcastMINCOTrajCallback,
+                                                              this,
+                                                              ros::TransportHints().tcpNoDelay());
+    have_recv_pre_agent_ = false;
+    checkpoints_pub_ = node_.advertise<visualization_msgs::Marker>("checkpoints",10);
+    node_.param("fsm/des_clearence",des_clearence_,1.5);
 }
 
 // void FakeReplanFSM::planCallback(const std_msgs::Bool& msg){
@@ -140,7 +152,10 @@ void FakeReplanFSM::execFSMCallback(const ros::TimerEvent &e)
     switch (exec_state_)
     {
       case INIT:{
-      if(! have_odom_)goto force_return;
+      if(! have_odom_){
+        ROS_WARN_THROTTLE(1.0,"No ODOM !!");
+        goto force_return;
+      }
       if(! trigger_)goto force_return;
         changeFSMExecState(WAIT_TRAJ, "INIT -> WAIT_TRAJ");
         break;
@@ -149,14 +164,14 @@ void FakeReplanFSM::execFSMCallback(const ros::TimerEvent &e)
       case WAIT_TRAJ:{
         if(! trigger_ || ! have_odom_) goto force_return;
           // Skip replanning during odom jump cooldown period
-          if (odom_jumped_ && (ros::Time::now() - odom_jump_time_).toSec() < odom_jump_cooldown_) {
-            ROS_WARN_THROTTLE(0.2, "Odom jump cooldown, waiting %.1fs before replanning",
-                              odom_jump_cooldown_ - (ros::Time::now() - odom_jump_time_).toSec());
-            goto force_return;
-          }
-          if (odom_jumped_) {
-            odom_jumped_ = false;  // cooldown passed, clear flag
-          }
+          // if (odom_jumped_ && (ros::Time::now() - odom_jump_time_).toSec() < odom_jump_cooldown_) {
+          //   ROS_WARN_THROTTLE(0.2, "Odom jump cooldown, waiting %.1fs before replanning",
+          //                     odom_jump_cooldown_ - (ros::Time::now() - odom_jump_time_).toSec());
+          //   goto force_return;
+          // }
+          // if (odom_jumped_) {
+          //   odom_jumped_ = false;  // cooldown passed, clear flag
+          // }
           if(!waypoint_list_.empty() && current_wp_idx_ < (int)waypoint_list_.size()){
             bool ok = planToTarget(waypoint_list_[current_wp_idx_]);
             if (ok) {
@@ -206,7 +221,7 @@ void FakeReplanFSM::execFSMCallback(const ros::TimerEvent &e)
                 ROS_WARN("Current consecutive_replan_cnt = %d",consecutive_replan_cnt_);
                 if (consecutive_replan_cnt_ >= 30) {
                   rise_target_ = odom_pos_;
-                  rise_target_.z() += 2.0;
+                  rise_target_.z() += 0.8;
                   changeFSMExecState(RISING, "Too many replans, rising");
                 }else{
                   have_traj_ = false;
@@ -318,9 +333,12 @@ bool FakeReplanFSM::planToTarget(const Eigen::Vector3d &target_pt) {
     
     if (success) {
         traj_utils::PolyTraj poly_msg;
-        planner_manager_->polyTraj2ROSMsg(poly_msg);
+        traj_utils::MINCOTraj MINCO_msg;
+        //traj_utils::Waypoints Waypoints_msg;
+        planner_manager_->polyTraj2ROSMsg(poly_msg,MINCO_msg);
         publishTraj(poly_msg);
         have_traj_ = true;
+        broadcast_ploytraj_pub_.publish(MINCO_msg);
     }
     
     return success;
@@ -341,7 +359,27 @@ void FakeReplanFSM::emergencyStop()
   }
 }
 
-void FakeReplanFSM::triggerCallback(const nav_msgs::PathPtr &msg)
+// void FakeReplanFSM::triggerCallback(const nav_msgs::PathPtr &msg)
+// {
+//   if (exec_state_ == EMERGENCY_STOP)
+//   {
+//     changeFSMExecState(WAIT_TRAJ, "Resume from emergency stop");
+//   }
+//   if(have_traj_){
+//     ROS_WARN("On our way to current target, set goal later");
+//     return;
+//   }
+//     target_pt_ << msg -> poses[0].pose.position.x,
+//                   msg -> poses[0].pose.position.y,
+//                   msg -> poses[0].pose.position.z;            
+  
+//   waypoint_list_.clear();
+//   waypoint_list_.push_back(target_pt_);
+//   current_wp_idx_ = 0;
+//   trigger_ = true;
+// }
+
+void FakeReplanFSM::triggerCallback(const quadrotor_msgs::GoalSetConstPtr &msg)
 {
   if (exec_state_ == EMERGENCY_STOP)
   {
@@ -351,10 +389,11 @@ void FakeReplanFSM::triggerCallback(const nav_msgs::PathPtr &msg)
     ROS_WARN("On our way to current target, set goal later");
     return;
   }
-    target_pt_ << msg -> poses[0].pose.position.x,
-                  msg -> poses[0].pose.position.y,
-                  msg -> poses[0].pose.position.z;            
-  
+  if(msg -> drone_id != planner_manager_->pp_.drone_id){
+      return;
+  }
+  // ROS_ERROR("The drone id is: %d",msg->drone_id);
+  target_pt_ << msg->goal[0],msg->goal[1],msg->goal[2];
   waypoint_list_.clear();
   waypoint_list_.push_back(target_pt_);
   current_wp_idx_ = 0;
@@ -427,5 +466,204 @@ void FakeReplanFSM::changeFSMExecState(FSM_EXEC_STATE new_state, const std::stri
   printFSMExecState();
 }
 
+void FakeReplanFSM::RecvBroadcastMINCOTrajCallback(const traj_utils::MINCOTrajConstPtr &msg)
+{
+    // ROS_ERROR("The drone %d swarm vector size is %ld",planner_manager_->pp_.drone_id,planner_manager_->traj_.swarm_traj.size());
+    const size_t recv_id = (size_t)msg->drone_id;
+    if(planner_manager_->pp_.drone_id < recv_id || planner_manager_->pp_.drone_id == recv_id){
+      ROS_WARN_THROTTLE(1.0,"The level %d is bigger than level %ld",planner_manager_->pp_.drone_id,recv_id);
+      return;
+    }
+    // if ((int)recv_id == planner_manager_->pp_.drone_id) // myself
+    //   return;
+
+    if (msg->drone_id < 0)
+    {
+      ROS_ERROR("drone_id < 0 is not allowed in a swarm system!");
+      return;
+    }
+    if (msg->order != 5)
+    {
+      ROS_ERROR("Only support trajectory order equals 5 now!");
+      return;
+    }
+    if (msg->duration.size() != (msg->inner_x.size() + 1))
+    {
+      ROS_ERROR("WRONG trajectory parameters.");
+      return;
+    }
+    if (planner_manager_->traj_.swarm_traj.size() > recv_id &&
+        planner_manager_->traj_.swarm_traj[recv_id].drone_id == (int)recv_id &&
+        msg->start_time.toSec() - planner_manager_->traj_.swarm_traj[recv_id].start_time <= 0)
+    {
+      //ROS_WARN("Received drone %d's trajectory out of order or duplicated, abandon it.", (int)recv_id);
+      return;
+    }
+
+    ros::Time t_now = ros::Time::now();
+    if (abs((t_now - msg->start_time).toSec()) > 0.25)
+    {
+
+      if (abs((t_now - msg->start_time).toSec()) < 10.0) // 10 seconds offset, more likely to be caused by unsynced system time.
+      {
+        ROS_WARN("Time stamp diff: Local - Remote Agent %d = %fs",
+                 msg->drone_id, (t_now - msg->start_time).toSec());
+      }
+      else
+      {
+        ROS_ERROR("Time stamp diff: Local - Remote Agent %d = %fs, swarm time seems not synchronized, abandon!",
+                  msg->drone_id, (t_now - msg->start_time).toSec());
+        return;
+      }
+    }
+
+    /* Fill up the buffer */
+    if (planner_manager_->traj_.swarm_traj.size() <= recv_id)
+    {
+      for (size_t i = planner_manager_->traj_.swarm_traj.size(); i <= recv_id; i++)
+      {
+        swarmTrajData blank{};  // 值初始化，内置类型会零初始化
+        blank.drone_id = -1;
+        blank.start_time = 0.0;
+        planner_manager_->traj_.swarm_traj.push_back(blank);
+      }
+    }
+
+    if ( msg->start_time.toSec() <= planner_manager_->traj_.swarm_traj[recv_id].start_time ) // This must be called after buffer fill-up
+    {
+      ROS_WARN("Old traj received, ignored.");
+      return;
+    }
+
+    /* Parse and store data */
+
+    planner_manager_->grid_map_->clearTemporaryObstacles(recv_id);
+
+    int piece_nums = msg->duration.size();
+    Eigen::Matrix<double, 3, 3> headState, tailState;
+    headState << msg->start_p[0], msg->start_v[0], msg->start_a[0],
+        msg->start_p[1], msg->start_v[1], msg->start_a[1],
+        msg->start_p[2], msg->start_v[2], msg->start_a[2];
+    tailState << msg->end_p[0], msg->end_v[0], msg->end_a[0],
+        msg->end_p[1], msg->end_v[1], msg->end_a[1],
+        msg->end_p[2], msg->end_v[2], msg->end_a[2];
+    Eigen::MatrixXd innerPts(3, piece_nums - 1);
+    Eigen::VectorXd durations(piece_nums);
+    for (int i = 0; i < piece_nums - 1; i++)
+      innerPts.col(i) << msg->inner_x[i], msg->inner_y[i], msg->inner_z[i];
+    for (int i = 0; i < piece_nums; i++)
+      durations(i) = msg->duration[i];
+ 
+    poly_traj::MinJerkOpt MJO;
+    MJO.reset(headState, tailState, piece_nums);
+    MJO.generate(innerPts, durations);
+
+    /* Ignore the trajectories that are far away */
+    Eigen::MatrixXd cps_chk = MJO.getInitConstraintPoints(3);
+
+    //VisuaWaypoints(cps_chk.transpose(),checkpoints_pub_);
+    //ROS_WARN("The checkpoints size is : %ld",cps_chk.rows());
+    // ROS_WARN("The innerpoints size is : %d",piece_nums);
+
+    bool far_away = true;
+    // ROS_ERROR_THROTTLE(1.0,"Current planning_horizon %f",planning_horizen_);
+    for (int i = 0; i < cps_chk.cols(); ++i)
+    {
+      if ((cps_chk.col(i) - odom_pos_).norm() < planner_manager_->pp_.planning_horizen_ ) // close to me that can not be ignored
+      {
+        far_away = false;
+        break;
+      }
+    }
+    if(far_away){
+      ROS_ERROR_THROTTLE(1.0,"FAR AWAY !");
+    }
+    // if(!have_recv_pre_agent_){
+    //   ROS_ERROR_THROTTLE(1.0,"No pre agent !");
+    // }
+    if (!far_away ) // Accept a far traj if no previous agent received
+    {
+      poly_traj::Trajectory trajectory = MJO.getTraj();
+      planner_manager_->traj_.swarm_traj[recv_id].traj = trajectory;
+      planner_manager_->traj_.swarm_traj[recv_id].drone_id = recv_id;
+      planner_manager_->traj_.swarm_traj[recv_id].start_time = msg->start_time.toSec();
+      planner_manager_->traj_.swarm_traj[recv_id].duration = trajectory.getTotalDuration();
+      planner_manager_->traj_.swarm_traj[recv_id].des_clearance = des_clearence_;
+
+      /* Check Collision */
+      ROS_ERROR("Let's check collision !");
+      ROS_ERROR("Current duration :%f",trajectory.getTotalDuration());
+      if (planner_manager_->checkCollision(recv_id))
+      {
+        ROS_ERROR("Need Replan due to other drone");
+
+        planner_manager_->grid_map_->addTemporaryObstacles(recv_id,cps_chk,0.2);
+        changeFSMExecState(WAIT_TRAJ, "SWARM_CHECK");
+        have_traj_ = false;
+        while(!have_traj_){
+          if(!waypoint_list_.empty() && current_wp_idx_ < (int)waypoint_list_.size()){
+              bool ok = planToTarget(waypoint_list_[current_wp_idx_]);
+              if (ok) {
+                  have_traj_ = true;
+                  changeFSMExecState(EXEC_TRAJ, "WAIT_TRAJ -> EXEC_TRAJ");
+              }
+            }
+      }
+
+      // /* Check if receive agents have lower drone id */
+      // if (!have_recv_pre_agent_)
+      // {
+      //   if ((int)planner_manager_->traj_.swarm_traj.size() >= planner_manager_->pp_.drone_id)
+      //   {
+      //     for (int i = 0; i < planner_manager_->pp_.drone_id; ++i)
+      //     {
+      //       if (planner_manager_->traj_.swarm_traj[i].drone_id != i)
+      //       {
+      //         break;
+      //       }
+
+      //       have_recv_pre_agent_ = true;
+      //     }
+      //   }
+      // }
+    }
+    else
+    {
+      planner_manager_->traj_.swarm_traj[recv_id].drone_id = -1; // Means this trajectory is invalid
+    }
+}
+}
+
+void FakeReplanFSM::VisuaWaypoints(const Eigen::MatrixXd &traj, ros::Publisher marker_pub){
+    visualization_msgs::Marker marker;
+    marker.header.frame_id = "map";
+    marker.header.stamp = ros::Time::now();
+    marker.ns = "minisnap_waypoints";
+    marker.id = 0;              
+
+    // 1. 先删除相同 id 的旧 Marker
+    marker.action = visualization_msgs::Marker::DELETE;
+    marker_pub.publish(marker);
+
+    // 2. 重新配置为添加模式
+    marker.action = visualization_msgs::Marker::ADD;
+    marker.type = visualization_msgs::Marker::SPHERE_LIST;
+    marker.scale.x = marker.scale.y = marker.scale.z = 0.15;
+    marker.color.r = 0.0; marker.color.g = 1.0; marker.color.b = 0.0; marker.color.a = 1.0;
+    marker.pose.orientation.w = 1.0;
+    
+    marker.points.clear();
+    // for (const auto &pt : traj) {
+    //     geometry_msgs::Point p;
+    //     p.x = pt.x(); p.y = pt.y(); p.z = pt.z();
+    //     marker.points.push_back(p);
+    // }
+    for(int i=0 ;i < traj.rows(); i++){
+      geometry_msgs::Point p;
+      p.x = traj(i,0),p.y = traj(i,1),p.z = traj(i,2);
+      marker.points.push_back(p);
+    }
+    marker_pub.publish(marker);
+}
 
 } // namespace fake_planner

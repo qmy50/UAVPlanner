@@ -1,0 +1,133 @@
+<launch>
+  <!-- size of map, change the size inflate x, y, z according to your application -->
+  <arg name="map_size_x" />
+  <arg name="map_size_y" />
+  <arg name="map_size_z" />
+  <arg name="fixed_frame" default="world"/>
+  <arg name="max_vel" />
+  <arg name="max_acc" />
+  <arg name="init_x" />
+  <arg name="init_y" />
+  <arg name="init_z" /> 
+  <arg name="drone_id" />
+  <arg name="target0_x" />
+  <arg name="target0_y" />
+  <arg name="target0_z" />
+
+  <!-- topic of your odometry such as VIO or LIO -->
+  <arg name="odom_topic"/>
+
+    <include file="$(find swarm_bridge)/launch/bridge_udp.launch">
+      <arg name="drone_id" value="$(arg drone_id)"/>
+      <arg name="broadcast_ip" value="127.0.0.255"/>
+    </include>
+
+  <!-- main algorithm params -->
+  <include file="$(find minco_curve)/launch/swarm/advanced_param.xml">
+
+    <arg name="map_size_x_" value="$(arg map_size_x)"/>
+    <arg name="map_size_y_" value="$(arg map_size_y)"/>
+    <arg name="map_size_z_" value="$(arg map_size_z)"/>
+    <arg name="odometry_topic" value="$(arg odom_topic)"/>
+
+    <!-- camera pose: transform of camera frame in the world frame -->
+    <!-- depth topic: depth image, 640x480 by default -->
+    <!-- don't set cloud_topic if you already set these ones! -->
+    <!--run in rviz-->
+    <arg name="depth_topic" value="pcl_render_node/depth"/>
+    <arg name="camera_pose_topic" value="pcl_render_node/camera_pose"/>
+
+    <!-- topic of point cloud measurement, such as from LIDAR  -->
+    <!-- don't set camera pose and depth, if you already set this one! -->
+    <arg name="cloud_topic" value="pcl_render_node/cloud"/>
+
+    <!-- intrinsic params of the depth camera -->
+    <arg name="cx" value="321.04638671875"/>
+    <arg name="cy" value="243.44969177246094"/>
+    <arg name="fx" value="387.229248046875"/>
+    <arg name="fy" value="387.229248046875"/>
+
+    <!-- maximum velocity and acceleration the drone will reach -->
+    <arg name="max_vel" value="$(arg max_vel)" />
+    <arg name="max_acc" value="$(arg max_acc)" />
+
+    <!--always set to 1.5 times grater than sensing horizen-->
+    <arg name="planning_horizon" value="7.5" /> 
+
+    <!-- 1: use 2D Nav Goal to select goal  -->
+    <!-- 2: use global waypoints below  -->
+    <arg name="flight_type" value="1" />
+    
+    <!-- global waypoints -->
+    <!-- It generates a piecewise min-snap traj passing all waypoints -->
+    <arg name="point_num" value="1" />
+
+    <arg name="point0_x" value="$(arg target0_x)" />
+    <arg name="point0_y" value="$(arg target0_y)" />
+    <arg name="point0_z" value="$(arg target0_z)" />
+
+    <arg name="point1_x" value="0.0" />
+    <arg name="point1_y" value="10.0" />
+    <arg name="point1_z" value="1.0" />
+
+    <arg name="point2_x" value="10.0" />
+    <arg name="point2_y" value="0.0" />
+    <arg name="point2_z" value="1.0" />
+
+    <arg name="point3_x" value="0.0" />
+    <arg name="point3_y" value="-10.0" />
+    <arg name="point3_z" value="1.0" />
+
+    <arg name="point4_x" value="-10.0" />
+    <arg name="point4_y" value="0.0" />
+    <arg name="point4_z" value="1.0" />
+
+    <arg name="drone_id" default="$(arg drone_id)"/>
+
+
+    <arg name="use_real_model" value="false"/>
+    
+  </include>
+
+  <!-- trajectory server -->
+  <node pkg="minco_curve" name="drone_$(arg drone_id)_traj_server_node" type="traj_server_node" output="screen">
+    <!-- <remap from="/position_cmd" to="planning/pos_cmd"/> -->
+    <remap from="~position_cmd" to="drone_$(arg drone_id)_position_cmd"/>
+    <remap from="~planning/trajectory" to="drone_$(arg drone_id)_planning/trajectory"/>
+    <param name="~time_forward" value="1.0" type="double"/>
+    <param name="~publish_pose_cmd" value="false" /> 
+    <param name="~publish_cmd_vel" value="false"/>
+    <param name="~manager/max_vel" value="$(arg max_vel)" /> 
+    <param name="~manager/max_acc" value="$(arg max_acc)"/>
+  </node>
+
+  <node pkg="waypoint_generator" name="drone_$(arg drone_id)_waypoint_generator" type="waypoint_generator" output="screen">
+    <remap from="~odom" to="$(arg odom_topic)"/>        
+    <remap from="~goal" to="drone_$(arg drone_id)/move_base_simple/goal_mine"/>
+    <remap from="~traj_start_trigger" to="/traj_start_trigger" />
+    <param name="waypoint_type" value="manual-lonely-waypoint"/>    
+  </node>
+
+  <node pkg="assign_goals" name="drone_$(arg drone_id)_assign_goals_node" type="assign_goals_node" output="screen">
+    <!-- <remap from="~odom" to="$(arg odom_topic)"/>        
+    <remap from="~goal" to="drone_$(arg drone_id)/move_base_simple/goal_mine"/>
+    <remap from="~traj_start_trigger" to="/traj_start_trigger" />
+    <param name="waypoint_type" value="manual-lonely-waypoint"/>     -->
+  </node>
+
+  <!-- use simulator -->
+  <include file="$(find minco_curve)/launch/swarm/simulator.xml">
+    <arg name="map_size_x_" value="$(arg map_size_x)"/>
+    <arg name="map_size_y_" value="$(arg map_size_y)"/>
+    <arg name="map_size_z_" value="$(arg map_size_z)"/>
+    <arg name="c_num" value="200"/>
+    <arg name="p_num" value="200"/>
+    <arg name="min_dist" value="1.2"/>
+    <arg name="init_x" value="$(arg init_x)"/>
+    <arg name="init_y" value="$(arg init_y)"/>
+    <arg name="init_z" value="$(arg init_z)"/> 
+    <arg name="drone_id" value="$(arg drone_id)"/>
+    <arg name="odometry_topic" value="$(arg odom_topic)" />
+  </include>
+
+</launch>

@@ -31,4 +31,9 @@ target_link_libraries(random_complex
   ${catkin_LIBRARIES}
   ${PCL_LIBRARIES})
 
+add_executable (random_complex_class src/random_complex_class.cpp )
+target_link_libraries(random_complex_class
+  ${catkin_LIBRARIES}
+  ${PCL_LIBRARIES})
+
 

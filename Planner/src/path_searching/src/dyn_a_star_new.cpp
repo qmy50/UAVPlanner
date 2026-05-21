@@ -94,7 +94,7 @@ bool AStar::ConvertToIndexAndAdjustStartEndPoints(Vector3d start_pt, Vector3d en
         return false;
 
     int occ;
-    if (checkOccupancy(Index2Coord(start_idx)))
+    if (checkOccupancy(Index2Coord(start_idx),drone_id_))
     {
         // ROS_WARN("Start point is insdide an obstacle.");
         do
@@ -106,7 +106,7 @@ bool AStar::ConvertToIndexAndAdjustStartEndPoints(Vector3d start_pt, Vector3d en
                 return false;
             }
 
-            occ = checkOccupancy(Index2Coord(start_idx));
+            occ = checkOccupancy(Index2Coord(start_idx),drone_id_);
             if (occ == -1)
             {
                 Eigen::Vector3d pos = Index2Coord(start_idx);
@@ -117,7 +117,7 @@ bool AStar::ConvertToIndexAndAdjustStartEndPoints(Vector3d start_pt, Vector3d en
         } while (occ);
     }
 
-    if (checkOccupancy(Index2Coord(end_idx)))
+    if (checkOccupancy(Index2Coord(end_idx),drone_id_))
     {
         // ROS_WARN("End point is insdide an obstacle.");
         do
@@ -129,13 +129,13 @@ bool AStar::ConvertToIndexAndAdjustStartEndPoints(Vector3d start_pt, Vector3d en
                 return false;
             }
 
-            occ = checkOccupancy(Index2Coord(start_idx));
+            occ = checkOccupancy(Index2Coord(start_idx),drone_id_);
             if (occ == -1)
             {
                 ROS_WARN("[Astar] End point outside the map region.");
                 return false;
             }
-        } while (checkOccupancy(Index2Coord(end_idx)));
+        } while (checkOccupancy(Index2Coord(end_idx),drone_id_));
     }
 
     return true;
@@ -231,7 +231,7 @@ ASTAR_RET AStar::AstarSearch(const double step_size, Vector3d start_pt, Vector3d
 
                     neighborPtr->rounds = rounds_;
 
-                    if (checkOccupancy(Index2Coord(neighborPtr->index)))
+                    if (checkOccupancy(Index2Coord(neighborPtr->index),drone_id_))
                     {
                         continue;
                     }
@@ -376,8 +376,9 @@ vector<Vector3d> AStar::getPath()
         path.push_back(Index2Coord(ptr->index));
 
     reverse(path.begin(), path.end());
-    // double rdp_epsilon = 0.3;
+    // double rdp_epsilon = 0.05;
     // vector<Vector3d> simplified_path;
     // rdpSimplify(path,simplified_path,rdp_epsilon,0,path.size()-1);
+    // ROS_WARN("The path size is %d",simplified_path.size());
     return path;
 }

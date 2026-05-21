@@ -10,8 +10,8 @@ Panels:
         - /Path1
         - /Path2
         - /Marker1
-        - /UAV1
         - /PointCloud22
+        - /UAV_01
       Splitter Ratio: 0.5
     Tree Height: 839
   - Class: rviz/Selection
@@ -141,15 +141,7 @@ Visualization Manager:
       Marker Topic: /fake_planner_node/minisnap_waypoints
       Name: Marker
       Namespaces:
-        minisnap_waypoints: true
-      Queue Size: 100
-      Value: true
-    - Class: rviz/Marker
-      Enabled: true
-      Marker Topic: /odom_visualization/robot
-      Name: UAV
-      Namespaces:
-        drone: true
+        {}
       Queue Size: 100
       Value: true
     - Alpha: 1
@@ -180,6 +172,14 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /odom_visualization/robot
+      Name: UAV_0
+      Namespaces:
+        drone: true
+      Queue Size: 100
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 243; 236; 166
@@ -203,7 +203,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 29.259164810180664
+      Distance: 79.75325012207031
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -219,9 +219,9 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.6497970819473267
+      Pitch: 1.26979660987854
       Target Frame: <Fixed Frame>
-      Yaw: 4.93185567855835
+      Yaw: 3.58186674118042
     Saved: ~
 Window Geometry:
   Displays:

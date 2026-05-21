@@ -72,7 +72,7 @@ class PathPlannerSim3D{
 
     public:
         std::vector<Eigen::Vector3d> current_minisnap_waypoints_;
-        PathPlannerSim3D(ros::NodeHandle &nh);
+        PathPlannerSim3D(ros::NodeHandle &nh,const int& id);
         void setParam(ros::NodeHandle &nh);
         void setEnvironment(const GridMap::Ptr &map);
         // void checkAndPlan(const ros::TimerEvent&);  
@@ -94,6 +94,7 @@ class PathPlannerSim3D{
         bool have_minco_waypoints_,have_minisnap_waypoints_;
         bool have_current_traj_;
         bool use_real_model_;
+        int drone_id_;
 
         inline std::vector<Eigen::Vector3d> getCurrentAstarPath(){
         return current_a_star_waypoints_;

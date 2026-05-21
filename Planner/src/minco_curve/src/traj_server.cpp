@@ -21,6 +21,7 @@ geometry_msgs::Pose pose_cmd;
 
 bool receive_traj_ = false;
 bool have_last_cmd_pos_ = false;
+bool publish_cmd_vel = false;
 boost::shared_ptr<poly_traj::Trajectory> traj_;
 double traj_duration_;
 ros::Time start_time_;
@@ -248,15 +249,12 @@ void cmdCallback(const ros::TimerEvent &e)
       pose_cmd_pub.publish(pose_cmd);
       }
   }
-  if (true) {
+  if (publish_cmd_vel) {
     geometry_msgs::Twist vel_cmd;
 
     double yaw = current_yaw_;
     double cos_yaw = cos(yaw);
     double sin_yaw = sin(yaw);
-
-    // 世界系 -> 机体坐标系 (x向前, y向右, z向上)
-    // 前提是：世界系 x 东, y 北, 偏航角为从北向东旋转（即机头与北向夹角）
     double v_body_x =  vel(0) * cos_yaw + vel(1) * sin_yaw;
     double v_body_y = -vel(0) * sin_yaw + vel(1) * cos_yaw;
     double v_body_z =  vel(2);
@@ -264,9 +262,7 @@ void cmdCallback(const ros::TimerEvent &e)
     vel_cmd.linear.x = v_body_x;
     vel_cmd.linear.y = v_body_y;
     vel_cmd.linear.z = v_body_z;
-
-    // 如果需要同时发送偏航角速率，可取消下面注释
-    // vel_cmd.angular.z = yaw_yawdot.second;  
+    //vel_cmd.angular.z = yaw_yawdot.second;  
 
     cmd_vel_pub_.publish(vel_cmd);
     ROS_WARN_THROTTLE(1.0, "Send vel command (body frame)");
@@ -286,14 +282,15 @@ int main(int argc, char **argv)
 {
   ros::init(argc, argv, "traj_server");
   // ros::NodeHandle node;
-  ros::NodeHandle nh;
+  ros::NodeHandle nh("~");
   g_nh = &nh;
-  ros::Subscriber poly_traj_sub = nh.subscribe("/fake_planner_node/poly_traj", 10, polyTrajCallback);
+  nh.param<bool>("publish_cmd_vel", publish_cmd_vel, true);
+  ros::Subscriber poly_traj_sub = nh.subscribe("planning/trajectory", 10, polyTrajCallback);
 //   ros::Subscriber heartbeat_sub = nh.subscribe("heartbeat", 10, heartbeatCallback);
 
   ros::Subscriber odom_sub_ = nh.subscribe("/ground_truth/state",10,odometryCallback);
 
-  pos_cmd_pub = nh.advertise<quadrotor_msgs::PositionCommand>("/position_cmd", 50);
+  pos_cmd_pub = nh.advertise<quadrotor_msgs::PositionCommand>("position_cmd", 50);
 
   pose_cmd_pub = nh.advertise<geometry_msgs::Pose>("/pose_cmd", 50);
 
@@ -301,14 +298,15 @@ int main(int argc, char **argv)
 
   ros::Timer cmd_timer = nh.createTimer(ros::Duration(0.01), cmdCallback);
 
-  nh.param("manager/max_vel", max_vel_, 1.0);
-  nh.param("manager/max_acc", max_acc_, 0.7);
+  nh.param("/manager/max_vel", max_vel_, 1.0);
+  nh.param("/manager/max_acc", max_acc_, 0.7);
 
-  nh.param("traj_server/time_forward", time_forward_, 1.0);
-  nh.param("traj_server/pos_jump_thresh", pos_jump_thresh_, 1.0);  // reject traj if start jumps >1m
+  nh.param("/time_forward", time_forward_, 1.0);
+  nh.param("/pos_jump_thresh", pos_jump_thresh_, 1.0);  // reject traj if start jumps >1m
   last_yaw_ = 0.0;
   last_yawdot_ = 0.0;
   have_last_cmd_pos_ = false;
+
 
   ros::Duration(1.0).sleep();
 

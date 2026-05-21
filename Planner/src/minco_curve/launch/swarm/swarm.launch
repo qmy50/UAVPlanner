@@ -1,0 +1,86 @@
+<launch>
+	    <arg name="map_size_x" value="30.0"/>
+	    <arg name="map_size_y" value="30.0"/>
+    	<arg name="map_size_z" value=" 5.0"/>
+		<arg name="random_map_size_x_" value="20"/>
+		<arg name="random_map_size_y_" value="20"/>
+		<arg name="random_map_size_z_" value="5"/>
+    	<arg name="odom_topic" value="visual_slam/odom" />
+		<arg name="max_vel" value="2.0" />
+		<arg name="max_acc" value="1.5" />
+    	<!-- swarm topic transmitter bridge-->
+    	<include file="$(find swarm_bridge)/launch/bridge_udp.launch">
+			<arg name="drone_id" value="999"/>
+			<arg name="broadcast_ip" value="127.0.0.255"/>
+    	</include>
+    	<!-- map --> 
+		<node pkg ="map_generator" name ="random_complex" type ="random_complex" output = "screen">    
+			
+
+			<param name="map/x_size"     value="$(arg random_map_size_x_)" />
+			<param name="map/y_size"     value="$(arg random_map_size_y_)" />
+			<param name="map/z_size"     value="$(arg random_map_size_z_)" />
+
+			<param name="map/circle_num" value="40"/>        
+			<param name="map/obs_num"    value="80"/>        
+			<param name="map/resolution" value="0.1"/>        
+
+			<param name="ObstacleShape/lower_rad" value="1"/>
+			<param name="ObstacleShape/upper_rad" value="1"/>
+			<param name="ObstacleShape/lower_hei" value="1"/>
+			<param name="ObstacleShape/upper_hei" value="4"/>
+
+			<param name="CircleShape/lower_circle_rad"   value="0.6"/>        
+			<param name="CircleShape/upper_circle_rad"   value="2.0"/>        
+			
+			<param name="sensing/rate"   value="0.5"/>        
+		</node>  
+		
+		<include file="$(find minco_curve)/launch/swarm/test_swarm_fsm.launch">
+			<arg name="drone_id"   value="0"/>
+			<arg name="init_x"     value="-11"/>
+			<arg name="init_y"     value="0"/>
+			<arg name="init_z"     value="1.5"/>
+			<arg name="map_size_x" value="$(arg map_size_x)"/>
+			<arg name="map_size_y" value="$(arg map_size_y)"/>
+			<arg name="map_size_z" value="$(arg map_size_z)"/>
+			<arg name="odom_topic" value="$(arg odom_topic)"/>
+			<arg name="max_vel" value="$(arg max_vel)" />
+			<arg name="max_acc" value="$(arg max_acc)" />
+			<arg name="target0_x" value="11" />
+			<arg name="target0_y" value = "0"/>
+			<arg name="target0_z" value = "1.5"/>
+		</include>
+
+    <include file="$(find minco_curve)/launch/swarm/test_swarm_fsm.launch">
+			<arg name="drone_id"   value="1"/>
+			<arg name="init_x"     value="-11"/>
+			<arg name="init_y"     value="-2.5"/>
+			<arg name="init_z"     value="1.5"/>
+			<arg name="map_size_x" value="$(arg map_size_x)"/>
+			<arg name="map_size_y" value="$(arg map_size_y)"/>
+			<arg name="map_size_z" value="$(arg map_size_z)"/>
+			<arg name="odom_topic" value="$(arg odom_topic)"/>
+			<arg name="max_vel" value="$(arg max_vel)" />
+			<arg name="max_acc" value="$(arg max_acc)" />
+			<arg name="target0_x" value="11" />
+			<arg name="target0_y" value = "-5.5"/>
+			<arg name="target0_z" value = "1.5"/>
+		</include>
+	
+	    <include file="$(find minco_curve)/launch/swarm/test_swarm_fsm.launch">
+			<arg name="drone_id"   value="2"/>
+			<arg name="init_x"     value="-11"/>
+			<arg name="init_y"     value="2.5"/>
+			<arg name="init_z"     value="1.5"/>
+			<arg name="map_size_x" value="$(arg map_size_x)"/>
+			<arg name="map_size_y" value="$(arg map_size_y)"/>
+			<arg name="map_size_z" value="$(arg map_size_z)"/>
+			<arg name="odom_topic" value="$(arg odom_topic)"/>
+			<arg name="max_vel" value="$(arg max_vel)" />
+			<arg name="max_acc" value="$(arg max_acc)" />
+			<arg name="target0_x" value="11" />
+			<arg name="target0_y" value = "5.5"/>
+			<arg name="target0_z" value = "1.5"/>
+		</include>
+</launch>

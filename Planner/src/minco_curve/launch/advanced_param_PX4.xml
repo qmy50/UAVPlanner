@@ -136,6 +136,7 @@
     <param name="manager/drone_id" value="$(arg drone_id)" type="int"/>
 
     <param name="use_real_model" value="$(arg use_real_model)"/>
+     <param name="cloud_topic" value="$(arg cloud_topic)"/>
   </node>
 
 </launch>

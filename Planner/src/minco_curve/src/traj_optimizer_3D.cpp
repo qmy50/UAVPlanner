@@ -1,17 +1,20 @@
 #include "traj_optmizer_3D.h"
 
 
-PathPlannerSim3D::PathPlannerSim3D(ros::NodeHandle &nh)
-        : public_nh(nh), has_map_(false), planned_(false) {
+PathPlannerSim3D::PathPlannerSim3D(ros::NodeHandle &nh,const int& id)
+        : public_nh(nh), has_map_(false), planned_(false), drone_id_(id) {
         std::string cloud_topic;
-        public_nh.param<std::string>("cloud_topic", cloud_topic, "/grid_map/occupancy_inflate");
+        public_nh.param<std::string>("cloud_topic", cloud_topic, "/random_complex/global_map");
+        ROS_WARN("The cloud topic is %s",cloud_topic.c_str());
+        ROS_WARN("The cloud topic is %s",cloud_topic.c_str());
+        ROS_WARN("The cloud topic is %s",cloud_topic.c_str());
         public_nh.param("use_real_model",use_real_model_,false);
         map_sub_ = public_nh.subscribe(cloud_topic, 1, &PathPlannerSim3D::MapCallback, this);
 
         path_pub_ = public_nh.advertise<nav_msgs::Path>("search_path", 1);
         traj_pub_ = public_nh.advertise<nav_msgs::Path>("opt_traj", 1);
         grid_map_vis_pub_ = public_nh.advertise<sensor_msgs::PointCloud2>("grid_map_vis", 1);
-        stc_pub_ = public_nh.advertise<decomp_ros_msgs::PolyhedronArray>("/stc", 1);
+        stc_pub_ = public_nh.advertise<decomp_ros_msgs::PolyhedronArray>("stc", 1);
         waypoint_pub_ = public_nh.advertise<visualization_msgs::Marker>("minco_waypoints", 10);
         minisnap_pub_ = public_nh.advertise<visualization_msgs::Marker>("minisnap_waypoints", 10);
         wp_traj_vis_pub_ = public_nh.advertise<visualization_msgs::Marker>("minijerk_waypoints", 10);
@@ -40,7 +43,7 @@ PathPlannerSim3D::PathPlannerSim3D(ros::NodeHandle &nh)
     void PathPlannerSim3D::setEnvironment(const GridMap::Ptr &map){
         grid_map_ = map;
 
-        a_star_.reset(new AStar);
+        a_star_.reset(new AStar(drone_id_));
         a_star_->initGridMap(grid_map_, Eigen::Vector3i(100, 100, 100));
         has_map_ = true;
 
@@ -53,7 +56,7 @@ PathPlannerSim3D::PathPlannerSim3D(ros::NodeHandle &nh)
         double offset = 0.15; 
         Eigen::Vector3d dir(1.0, 1.0, 0.0); 
         for(const auto& waypoint_position : current_minco_waypoints_){
-            if(a_star_->checkOccupancy(waypoint_position)){
+            if(a_star_->checkOccupancy(waypoint_position,drone_id_)){
                 have_a_star_path_ = false;
                 have_current_traj_ = false;
                 have_minco_waypoints_ = false;
@@ -81,10 +84,10 @@ PathPlannerSim3D::PathPlannerSim3D(ros::NodeHandle &nh)
         double step_size;
         if(use_real_model_){
             step_size = grid_map_->getResolution() + 0.2;
-            ROS_WARN("USED");
+            //ROS_WARN("USED");
         }else{
             step_size = grid_map_->getResolution() + 0.5;
-             ROS_WARN("DID NOT USED");
+            //ROS_WARN("DID NOT USED");
         }
         // ROS_INFO("resolution is %f",step_size);
         // ROS_INFO("the start pos is x=%f,y=%f,z=%f",start_position(0),start_position(1),start_position(2));
@@ -210,7 +213,7 @@ PathPlannerSim3D::PathPlannerSim3D(ros::NodeHandle &nh)
         //     total_dist += (minisnap_waypoints[i]-minisnap_waypoints[i-1]).norm();
         // }
         // ROS_WARN("The init total distance is %f",total_dist);
-        ROS_WARN("The init total time is %f",polytime_init_.sum());
+        //ROS_WARN("The init total time is %f",polytime_init_.sum());
         opt_.setParameters(inPos.transpose(), polytime_init_);
 
         // Trajectory<3, 5> traj;
@@ -227,9 +230,8 @@ PathPlannerSim3D::PathPlannerSim3D(ros::NodeHandle &nh)
         VisuaTraj(traj_pts,traj_pub_);
         ros::Time end = ros::Time::now();
         double elapsed = (end - start).toSec();
-        ROS_WARN("Plan succeed ! Planning time elapsed: %.6f s", elapsed);
+        //ROS_WARN("Plan succeed ! Planning time elapsed: %.6f s", elapsed);
     }
-
     
     // decompose velocity into x/y components
     // theta: velocity direction（maybe yaw）

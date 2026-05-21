@@ -64,6 +64,14 @@ target_link_libraries(traj_server_node
     ${catkin_LIBRARIES}
 )
 
+add_executable(fake_odom_node src/fake_odom.cpp)
+
+# 链接库（仅链接实际需要的）
+target_link_libraries(fake_odom_node
+    ${catkin_LIBRARIES}
+)
+
+
 add_executable(test_node 
     src/test.cpp
     src/minisnap.cpp

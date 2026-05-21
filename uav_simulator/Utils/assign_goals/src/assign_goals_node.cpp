@@ -81,7 +81,8 @@ void selected_drones_cb(const geometry_msgs::PoseStamped::ConstPtr &msg)
     drones_.clear();
   }
   Selected_t drone;
-  drone.drone_id = atoi(msg->header.frame_id.substr(5, 10).c_str());
+  drone.drone_id = atoi(msg->header.frame_id.substr(6).c_str());
+  ROS_WARN("Receive drone id is :%d",drone.drone_id);
   drone.p << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
   drones_.push_back(drone);
 

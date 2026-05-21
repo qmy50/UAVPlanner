@@ -444,7 +444,7 @@ namespace poly_traj
             return positions;
         }
 
-        inline const Piece &operator[](int i) const
+        inline const Piece &operator[](int i) const //这里operator前边的&表示返回引用，直接返回原来那个数据，不复制
         {
             return pieces[i];
         }

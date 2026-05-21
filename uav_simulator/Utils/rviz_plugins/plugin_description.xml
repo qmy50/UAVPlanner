@@ -27,4 +27,5 @@
       Display of multiple -inf +inf probabilistic occupancy grid map
     </description>
   </class>  
+  
 </library>

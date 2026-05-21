@@ -142,13 +142,50 @@ int GridMap::getOccupancy(Eigen::Vector3d pos) {
   return md_->occupancy_buffer_[toAddress(id)] > mp_.min_occupancy_log_ ? 1 : 0;
 }
 
+// int GridMap::getInflateOccupancy(Eigen::Vector3d pos) {
+//   if (!isInMap(pos)) return -1;
+
+//   Eigen::Vector3i id;
+//   posToIndex(pos, id);
+
+//   return int(md_->occupancy_buffer_inflate_[toAddress(id)]);
+// }
+
 int GridMap::getInflateOccupancy(Eigen::Vector3d pos) {
-  if (!isInMap(pos)) return -1;
+    if (!isInMap(pos)) return -1;
 
-  Eigen::Vector3i id;
-  posToIndex(pos, id);
+    Eigen::Vector3i id;
+    posToIndex(pos, id);
+    int addr = toAddress(id);
 
-  return int(md_->occupancy_buffer_inflate_[toAddress(id)]);
+    if (md_->occupancy_buffer_inflate_[addr] > 0) return 1;
+    return 0;
+}
+
+int GridMap::getInflateOccupancy(Eigen::Vector3d pos ,const int& drone_id) {
+    if (!isInMap(pos)) return -1;
+
+    Eigen::Vector3i id;
+    posToIndex(pos, id);
+    int addr = toAddress(id);
+
+    if (md_->occupancy_buffer_inflate_[addr] > 0) return 1;
+    {
+      //ROS_WARN_THROTTLE(0.5,"drone id is :%d",drone_id);
+      for(int i=0;i<drone_id;i++){
+        auto map_it = temp_obs_by_id_.find(i);
+        if(map_it != temp_obs_by_id_.end()){
+          const auto& obs_set = map_it->second;
+          auto addr_it = obs_set.find(addr);
+          if(addr_it != obs_set.end()){
+            ROS_WARN("Got you!");
+            return 1;
+          }
+        }
+    }
+      // std::lock_guard<std::mutex> lock(temp_obs_mutex_);
+    }
+    return 0;
 }
 
 int GridMap::getOccupancy(Eigen::Vector3i id) {
@@ -315,12 +352,12 @@ void GridMap::initMap(ros::NodeHandle &nh)
 
   /* init callback */
 
-  depth_sub_.reset(new message_filters::Subscriber<sensor_msgs::Image>(node_, "/grid_map/depth", 50));
+  depth_sub_.reset(new message_filters::Subscriber<sensor_msgs::Image>(node_, "grid_map/depth", 50));
 
   if (mp_.pose_type_ == POSE_STAMPED)
   {
     pose_sub_.reset(
-        new message_filters::Subscriber<geometry_msgs::PoseStamped>(node_, "/grid_map/pose", 25));
+        new message_filters::Subscriber<geometry_msgs::PoseStamped>(node_, "grid_map/pose", 25));
 
     sync_image_pose_.reset(new message_filters::Synchronizer<SyncPolicyImagePose>(
         SyncPolicyImagePose(100), *depth_sub_, *pose_sub_));
@@ -328,7 +365,7 @@ void GridMap::initMap(ros::NodeHandle &nh)
   }
   else if (mp_.pose_type_ == ODOMETRY)
   {
-    odom_sub_.reset(new message_filters::Subscriber<nav_msgs::Odometry>(node_, "/grid_map/odom", 100));
+    odom_sub_.reset(new message_filters::Subscriber<nav_msgs::Odometry>(node_, "grid_map/odom", 100));
 
     sync_image_odom_.reset(new message_filters::Synchronizer<SyncPolicyImageOdom>(
         SyncPolicyImageOdom(100), *depth_sub_, *odom_sub_));
@@ -337,17 +374,17 @@ void GridMap::initMap(ros::NodeHandle &nh)
 
   // use odometry and point cloud
   indep_cloud_sub_ =
-      node_.subscribe<sensor_msgs::PointCloud2>("/grid_map/cloud", 10, &GridMap::cloudCallback, this);
+      node_.subscribe<sensor_msgs::PointCloud2>("grid_map/cloud", 10, &GridMap::cloudCallback, this);
   indep_odom_sub_ =
-      node_.subscribe<nav_msgs::Odometry>("/grid_map/odom", 10, &GridMap::odomCallback, this);
+      node_.subscribe<nav_msgs::Odometry>("grid_map/odom", 10, &GridMap::odomCallback, this);
 
   occ_timer_ = node_.createTimer(ros::Duration(0.05), &GridMap::updateOccupancyCallback, this);
   vis_timer_ = node_.createTimer(ros::Duration(0.05), &GridMap::visCallback, this);
 
-  map_pub_ = node_.advertise<sensor_msgs::PointCloud2>("/grid_map/osccupancy", 10);
-  map_inf_pub_ = node_.advertise<sensor_msgs::PointCloud2>("/grid_map/occupancy_inflate", 10);
+  map_pub_ = node_.advertise<sensor_msgs::PointCloud2>("grid_map/osccupancy", 10);
+  map_inf_pub_ = node_.advertise<sensor_msgs::PointCloud2>("grid_map/occupancy_inflate", 10);
 
-  unknown_pub_ = node_.advertise<sensor_msgs::PointCloud2>("/grid_map/unknown", 10);
+  unknown_pub_ = node_.advertise<sensor_msgs::PointCloud2>("grid_map/unknown", 10);
 
   md_->occ_need_update_ = false;
   md_->local_updated_ = false;
@@ -368,15 +405,20 @@ void GridMap::initMap(ros::NodeHandle &nh)
   // 处理动态障碍物
   dynamic_obs_client_ = node_.serviceClient<onboard_detector::GetDynamicObstacles>("/get_dynamic_obstacles");
   dynamic_obs_client_.waitForExistence(ros::Duration(5.0));
-  ROS_WARN("WE get the dynamic obstacles service");
+  //ROS_WARN("WE get the dynamic obstacles service");
   dynamic_obs_timer_ = node_.createTimer(ros::Duration(0.2), &GridMap::dynamicObstacleTimerCallback, this);
   predict_obs_pub_ = node_.advertise<geometry_msgs::Point>("/predict_obs_points",10);
   nh.param<double>("dynamic_obs_timeout", dynamic_obs_timeout_, 0.1);
   last_dynamic_obs_time_ = ros::Time(0);  
   dynamic_obs_flag_pub_ = nh.advertise<std_msgs::Bool>("/have_dynamic_obstacle", 1);
   node_.param("grid_map/use_dwa",use_dwa_,false);
+
+  // swarm
+  temp_obs_pub_ = nh.advertise<sensor_msgs::PointCloud2>("temp_obs",10);
 }
 
+
+// dwa相关实现
 void GridMap::dynamicObstacleTimerCallback(const ros::TimerEvent&) {
     if (!md_->has_odom_ || !use_dwa_) return;
 
@@ -491,7 +533,102 @@ std::vector<Eigen::Vector3d> GridMap::getPredictedObs(double predict_time = 1.0,
     return predict_points;
 }
 
+// swarm相关实现
+// 1. 添加指定无人机产生的临时障碍物（膨胀半径可指定）
+  void GridMap::addTemporaryObstacles(int drone_id, const Eigen::MatrixXd &points, double radius)
+  { 
+      {
+        std::lock_guard<std::mutex> lock(temp_obs_mutex_);
+        
+        if (radius <= 0) radius = mp_.resolution_;   // 至少一个体素
+        int radius_voxel = std::ceil(radius / mp_.resolution_);
+        
+        auto& obs_set = temp_obs_by_id_[drone_id];   // 若不存在则自动创建
+        
+        for (int i=0; i< points.cols(); i++) {
+            Eigen::Vector3i center_idx;
+            posToIndex(points.col(i), center_idx);
+            if (!isInMap(center_idx)) continue;
+            
+            // 膨胀立方体
+            for (int dx = -radius_voxel; dx <= radius_voxel; ++dx) {
+                for (int dy = -radius_voxel; dy <= radius_voxel; ++dy) {
+                    for (int dz = -radius_voxel; dz <= radius_voxel; ++dz) {
+                        Eigen::Vector3i idx = center_idx + Eigen::Vector3i(dx, dy, dz);
+                        if (isInMap(idx)) {
+                            obs_set.insert(toAddress(idx));
+                            // md_->occupancy_buffer_inflate_[toAddress(idx)] = 1;
+                        }
+                    }
+                }
+            }
+        }
+      }
+      publishTempObstacles(temp_obs_pub_,"world",ros::Time::now());
+  }
 
+  // 2. 清除指定无人机的临时障碍物
+  void GridMap::clearTemporaryObstacles(int drone_id)
+  {
+      std::lock_guard<std::mutex> lock(temp_obs_mutex_);
+      temp_obs_by_id_.erase(drone_id);
+  }
+
+  // 3. 清除所有临时障碍物（可选，保持向后兼容）
+  void GridMap::clearAllTemporaryObstacles()
+  {
+      std::lock_guard<std::mutex> lock(temp_obs_mutex_);
+      temp_obs_by_id_.clear();
+  }
+
+  // 4. 获取所有临时障碍物的体素地址（合并去重）
+  std::unordered_set<int> GridMap::getAllTempObsAddresses() const
+  {
+      std::lock_guard<std::mutex> lock(temp_obs_mutex_);
+      std::unordered_set<int> all_addresses;
+      for (const auto& pair : temp_obs_by_id_) {
+          all_addresses.insert(pair.second.begin(), pair.second.end());
+      }
+      return all_addresses;
+  }
+
+void GridMap::publishTempObstacles(const ros::Publisher& pub, const std::string& frame_id, const ros::Time& stamp)
+{
+    // 获取所有临时障碍物的体素地址
+    std::unordered_set<int> addresses = getAllTempObsAddresses();
+    
+    pcl::PointCloud<pcl::PointXYZ> cloud;
+    cloud.header.frame_id = frame_id;
+    cloud.header.stamp = stamp.toNSec() / 1000; // pcl 使用 us 时间戳
+    
+    for (int addr : addresses) {
+        Eigen::Vector3i idx = addressToIndex(addr);
+        Eigen::Vector3d pos;
+        indexToPos(idx, pos);  // 假设你的 indexToPos 是 void 形式，输出到 pos
+        
+        // 可选：过滤高度，就像你的示例中判断 mp_.visualization_truncate_height_
+        // if (pos.z() > mp_.visualization_truncate_height_) continue;
+        
+        cloud.push_back(pcl::PointXYZ(pos.x(), pos.y(), pos.z()));
+    }
+    
+    sensor_msgs::PointCloud2 cloud_msg;
+    pcl::toROSMsg(cloud, cloud_msg);
+    pub.publish(cloud_msg);
+}
+
+Eigen::Vector3i GridMap::addressToIndex(int addr) const
+{
+    int ny = mp_.map_voxel_num_(1);  // Y 轴体素数量
+    int nz = mp_.map_voxel_num_(2);  // Z 轴体素数量
+    
+    int x = addr / (ny * nz);
+    int rest = addr % (ny * nz);
+    int y = rest / nz;
+    int z = rest % nz;
+    
+    return Eigen::Vector3i(x, y, z);
+}
 
 void GridMap::resetBuffer()
 {

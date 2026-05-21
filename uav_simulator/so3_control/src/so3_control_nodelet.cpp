@@ -225,7 +225,7 @@ SO3ControlNodelet::onInit(void)
   odom_sub_ = n.subscribe("odom", 10, &SO3ControlNodelet::odom_callback, this,
                           ros::TransportHints().tcpNoDelay());
   position_cmd_sub_ =
-    n.subscribe("/position_cmd", 10, &SO3ControlNodelet::position_cmd_callback,
+    n.subscribe("position_cmd", 10, &SO3ControlNodelet::position_cmd_callback,
                 this, ros::TransportHints().tcpNoDelay());
 
   enable_motors_sub_ =

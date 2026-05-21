@@ -437,6 +437,31 @@ namespace minco
             return;
         }
 
+        inline Eigen::Matrix<double, dim, -1> getInitConstraintPoints(const int K) const
+        {
+            Eigen::Matrix<double, dim, -1> pts(dim, N * K + 1);
+            Eigen::Matrix<double, 6, 1> beta0;
+            double step, s;
+            int col = 0;
+
+            for (int i = 0; i < N; ++i) {
+                auto c = b.middleRows(6 * i, 6);   // 6 x dim
+                step = T1(i) / K;
+                s = 0.0;
+                int start_j = (i == 0) ? 0 : 1;
+                for (int j = start_j; j <= K; ++j) {
+                    double s2 = s * s;
+                    double s3 = s2 * s;
+                    double s4 = s2 * s2;
+                    double s5 = s4 * s;
+                    beta0 << 1.0, s, s2, s3, s4, s5;
+                    pts.col(col++) = c.transpose() * beta0;
+                    s += step;
+                }
+            }
+            return pts;
+        }
+
         inline void setParameters(const Eigen::Matrix<double, -1, dim> &inPs,
                                   const Eigen::VectorXd &ts)
         {
