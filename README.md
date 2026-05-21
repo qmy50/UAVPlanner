@@ -134,22 +134,49 @@ roslaunch onboard_detector run_detector.launch
 
 https://github.com/user-attachments/assets/85a1c213-504a-4d8b-ad33-5cb47a72ddd9
 
+## 六. 多机支持
+
+依据ego swarm多机路径规划框架进行修改，使用UDP广播各个无人机规划轨迹，并依据无人机编号设置优先级，每一架无人机将收到的高优先级无人机轨迹所占据的栅格设置为障碍物，
+从而完成过无人机避障
+
+可使用手动指定航点模式与使用预设航点两种模式执行多机rviz仿真
 
 
-## 六. Reference：
+
+https://github.com/user-attachments/assets/aa1ed226-2d7f-459d-b6bd-d0f6985ddaa6
+
+
+
+https://github.com/user-attachments/assets/c31f04aa-4187-42e2-aada-c58510e21752
+
+
+
+
+运行方式为启动swarm的luanch为文件
+```
+roslaunch minco_curve rviz.launch
+```
+```
+roslaunch minco_curve swarm.launch
+```
+
+
+## 七. Reference：
 [1]. 规划器整体建构及轨迹跟踪与动态环境更新，a*搜索等模块参考/使用 ego planner 
 
 链接为：https://github.com/ZJU-FAST-Lab/ego-planner
 
-[2]. 三维安全走廊生成采用开源库DecompROS，链接为：https://github.com/sikang/DecompROS
+[2]. 多机规划参考 ego swarm 链接为：https://github.com/ZJU-FAST-Lab/ego-planner-swarm
 
-[3]. 将STC与minco相结合参考了二维规划器FlowCore，链接为：https://github.com/Photin1a/FlowCore
+[3]. 三维安全走廊生成采用开源库DecompROS，链接为：https://github.com/sikang/DecompROS
 
-[4]. 加入安全走廊硬约束的离散minisnap QP求解，参考链接为：https://github.com/Gerrylgr/trajectory_optimization
+[4]. 将STC与minco相结合参考了二维规划器FlowCore，链接为：https://github.com/Photin1a/FlowCore
 
-[5]. PX4仿真部分使用XTdroen，链接为： https://gitee.com/robin_shaun/XTDrone
+[5]. 加入安全走廊硬约束的离散minisnap QP求解，参考链接为：https://github.com/Gerrylgr/trajectory_optimization
 
-[6]. 基于意图预测MPC机器人无人机导航动态避障，链接为： https://github.com/Zhefan-Xu/Intent-MPC
+[6]. PX4仿真部分使用XTdroen，链接为： https://gitee.com/robin_shaun/XTDrone
 
-[7]. DWA控制器参考链接为: https://github.com/QnJiu/ROS2-DWA-Autonomous-Navigation
+[7]. 基于意图预测MPC机器人无人机导航动态避障，链接为： https://github.com/Zhefan-Xu/Intent-MPC
+
+[8]. DWA控制器参考链接为: https://github.com/QnJiu/ROS2-DWA-Autonomous-Navigation
 
